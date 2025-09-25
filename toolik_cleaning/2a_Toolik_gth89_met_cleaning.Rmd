@@ -1051,7 +1051,7 @@ data_nested = met %>%
   group_by(year_month) %>%
   nest() %>%
   ungroup() %>%  # Important to prevent errors with grouped data
-  mutate(file_path = paste0(base_path, "biomet_", year_month, ".csv"))
+  mutate(file_path = paste0(base_path, "toolik_gth89_biomet_", year_month, ".csv"))
 
 walk2(
   .x = data_nested$data, 

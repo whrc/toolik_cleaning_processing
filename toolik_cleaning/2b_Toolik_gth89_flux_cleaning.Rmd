@@ -37,7 +37,7 @@ Load in eddypro output files
 
 #met = fread('C:/Users/klynoe/Documents/pond_inlet/R_outputs/pondinlet_met_clean_202505.csv')
 
-df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/fluxes_merged_2024_08_26.csv')
+df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/fluxes_merged_2025_08_26.csv')
 
 df$TIMESTAMP = paste(df$date, df$time)
 df$TIMESTAMP = as.POSIXct(df$TIMESTAMP, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
@@ -891,13 +891,13 @@ ggplot(data = diel)+geom_hline(yintercept = 0)+
 ```{r, warning=FALSE}
 df <- df[!duplicated(df$TIMESTAMP), ]
 
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/pond_inlet/R_outputs/pond_inlet_Flux_Met_Clean_May_25.csv',row.names = F,quote = F)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/toolik_Flux_Met_Clean_august_25.csv',row.names = F,quote = F)
 ```
 
 #NEST AND SPLIT THE DATA BY MONTH AND SAVE IN DESIRED DIRECTORY
 ```{r, warning=FALSE}
 
-base_path = "C:/Users/klynoe/Documents/pond_inlet/R_outputs/met_and_flux/"
+base_path = "C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux/"
 
 # Nest the data and prepare for saving
 data_nested = df %>%

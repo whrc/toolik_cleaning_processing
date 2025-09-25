@@ -16,7 +16,7 @@ library(lubridate)
 ####################################################################
 
 #load in the full output flux data ##################
-fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output'
+fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/2025'
 #fp = 'C:/Users/klynoe/Documents/pond_inlet/202410_full/eddypro/full_output/2024'
 files = list.files(path = fp,pattern = '*full_output.+csv$',recursive = T,full.names = T)
 
@@ -60,7 +60,7 @@ df = merge(ts,df,by = 'ts',all.x = T)
 
 
 #save off flux data
-write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/fluxes_merged_2024_08_26.csv',row.names = F)
+write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/fluxes_merged_2025_until_08.csv',row.names = F)
 
 
 ################
