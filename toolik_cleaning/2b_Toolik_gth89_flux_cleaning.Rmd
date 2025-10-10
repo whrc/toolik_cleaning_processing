@@ -35,14 +35,16 @@ Load in eddypro output files
 
 ```{r warning=FALSE}
 
-#met = fread('C:/Users/klynoe/Documents/pond_inlet/R_outputs/pondinlet_met_clean_202505.csv')
+met = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/biomet_clean.csv')
 
-df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/fluxes_merged_2025_08_26.csv')
+#df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/fluxes_merged_2025_08_26.csv')
+df = fread("C:/Users/klynoe/Documents/toolik/eddypro_output/2025/09/eddypro_09_25_full_output_2025-10-06T120635_adv.csv", skip = 3, header = F, na.strings = c('-9999','NA','NaN','NAN','-7999'))
+h = fread("C:/Users/klynoe/Documents/toolik/eddypro_output/2025/09/eddypro_09_25_full_output_2025-10-06T120635_adv.csv",skip = 1,nrows = 0)
+
+names(df) = names(h)
 
 df$TIMESTAMP = paste(df$date, df$time)
-df$TIMESTAMP = as.POSIXct(df$TIMESTAMP, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
-
-df$TIMESTAMP = df$ts
+df$TIMESTAMP = as.POSIXct(df$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
 
 # Ensure TIMESTAMP is in POSIXct format with UTC timezone
 df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, tz = "UTC")
@@ -65,13 +67,32 @@ tsdf = as.data.frame(TIMESTAMP)
 
 df = merge(tsdf,df,by = "TIMESTAMP",all = T)
 
+met$TIMESTAMP = as.POSIXct(met$TIMESTAMP, format = "%m/%d/%Y %H:%M", tz = "UTC")
+met$TIMESTAMP <- format(met$TIMESTAMP, "%Y-%m-%d %H:%M")
+met$TIMESTAMP = as.POSIXct(met$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
+
+start_time <- as.POSIXct("2025-08-31", tz = "UTC")
+end_time   <- as.POSIXct("2025-10-01", tz = "UTC")
+
+
+met <- met %>%
+  filter(TIMESTAMP >= start_time & TIMESTAMP <= end_time)
+
+met = merge(tsdf,met,by = "TIMESTAMP",all = T)
+
+df <- df %>%
+  filter(TIMESTAMP >= start_time & TIMESTAMP <= end_time)
+
+df = merge(df,met,by = "TIMESTAMP",all = T)
+df$ts = df$TIMESTAMP
+
 ```
 
 
 #Creates a variable to input a date range for the plots in the flux section of
 #cleaning code. Used to easily change date range for different data sets. 
 ```{r, warning=FALSE}
-flux_dates <- c("2025-05-01",'2025-08-30')
+flux_dates <- c("2025-08-31",'2025-10-01')
 ```
 
 #Create Flags
@@ -96,7 +117,7 @@ plot(df$qc_co2_flux, df$co2_flux.flag)
 combine energy fluxes by met and flux components
 
 ```{r}
-df$met = (df$LWIN_6_14_1_1_1.c + df$SWIN_6_10_1_1_1.c) - (df$LWOUT_6_15_1_1_1.c + df$SWOUT_6_11_1_1_1.c)
+df$met = (met$LWIN_1_1_1.c + met$SWIN_1_1_1.c) - (met$LWOUT_1_1_1.c + met$SWOUT_1_1_1.c)
 df$flux = df$H + df$LE
 
 plot(df$met, df$flux)
@@ -108,10 +129,10 @@ plot(df$met, df$flux)
 plot all solar radiation
 
 ```{r, warning=FALSE}
-plot(df$ts,df$SWIN_6_10_1_1_1.c)
-plot(df$ts,df$SWOUT_6_11_1_1_1.c)
-plot(df$ts,df$LWIN_6_14_1_1_1.c,ylim = c(0,800))
-plot(df$ts,df$LWOUT_6_15_1_1_1.c,ylim = c(0,800))
+plot(df$ts,df$SWIN_1_1_1.c)
+plot(df$ts,df$SWOUT_1_1_1.c)
+plot(df$ts,df$LWIN_1_1_1.c,ylim = c(0,800))
+plot(df$ts,df$LWOUT_1_1_1.c,ylim = c(0,800))
 ```
 
 create and plot mismatch variable between met and flux
@@ -200,13 +221,13 @@ hist(co2_flux.qc,breaks=100)
 plot(df$ts,co2_flux.qc,ylim = c(-25,25));abline(h=20, col= 'red');abline(h=-20, col='red')
 
 # 
-plot(df$ts,co2_flux.qc,ylim = c(-25,25));abline(h=7, col= 'red');abline(h=-10, col='red')
+plot(df$ts,co2_flux.qc,ylim = c(-25,25));abline(h=15, col= 'red');abline(h=-10, col='red')
 ```
 
 Clean based on graphs, create new variable (co2_flux.limits), and see cleaned product
 
 ```{r, warning=FALSE}
-co2_flux.limits = replace(df$co2_flux,(df$co2_flux > 7 | df$co2_flux < -10) & df$TIMESTAMP >= '2024-07-26' | (df$co2_flux > 10 | df$co2_flux < -14),NA)
+co2_flux.limits = replace(df$co2_flux,(df$co2_flux > 7 | df$co2_flux < -10) & df$TIMESTAMP >= '2024-08-31' | (df$co2_flux > 10 | df$co2_flux < -14),NA)
 
 # Make .flag = 3 everywhere where cleaning is done via absolute limits
 df$co2_flux.flag <- ifelse(is.na(co2_flux.limits) & !is.na(df$co2_flux) & df$co2_flux.flag != 2, 3, df$co2_flux.flag)
@@ -307,7 +328,7 @@ use night-time only flux values and plot Ustar based on data drop off
 df$nightCO2 = co2_flux.limits
 df$nightCO2 = replace(df$nightCO2,df$SWIN_6_10_1_1_1 > 5,NA)
 
-Uthreshold=0.075
+Uthreshold=0.05
 ggplot(data = df,aes(`u*`,nightCO2))+
   ylab(expression(paste("Flux (g-C", ~CO[2], ~"m",""^"-2","d",""^"-1",")")))+
   geom_point()+xlab("U*")+
@@ -822,9 +843,9 @@ df$month = as.numeric(format(df$ts,'%m'))
 
 diel = df %>%
   group_by(hour,month) %>%
-  select(co2_flux.c,LE.c,H.c,hour,month) %>%
+  select(co2_flux.c,ch4_flux.c,LE.c,H.c,hour,month) %>%
   summarise_all(.funs = c(median,sd),na.rm=T)
-#,ch4_flux.c
+#
 diel = subset(diel,!is.na(diel$month))
 ```
 
@@ -891,7 +912,7 @@ ggplot(data = diel)+geom_hline(yintercept = 0)+
 ```{r, warning=FALSE}
 df <- df[!duplicated(df$TIMESTAMP), ]
 
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/toolik_Flux_Met_Clean_august_25.csv',row.names = F,quote = F)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/toolik_Flux_Met_Clean_sep_25.csv',row.names = F,quote = F)
 ```
 
 #NEST AND SPLIT THE DATA BY MONTH AND SAVE IN DESIRED DIRECTORY
