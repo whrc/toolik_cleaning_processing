@@ -39,22 +39,29 @@ library(dplyr)
 
 #h = fread("C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllLogger.dat",skip=1, nrows = 0 , na.strings = c('-9999','NA','NaN','NAN','-7999'))
 
-df = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
+#df = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
 
-h = fread("C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat",skip=1, nrows = 0 , na.strings = c('-9999','NA','NaN','NAN','-7999'))
+#h = fread("C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat",skip=1, nrows = 0 , na.strings = c('-9999','NA','NaN','NAN','-7999'))
 
 
-names(df) = names(h)
+#names(df) = names(h)
 
 #df = rbind.fill(df,met)
-df = df[!duplicated(df$TIMESTAMP),]
+#df = df[!duplicated(df$TIMESTAMP),]
+
+df = read.csv('C:/Users/klynoe/Documents/toolik/R_outputs/gth89_biomet_1b.csv')
 
 
-df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, tz = "UTC")
+df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
+
+# Replace specific missing value indicators with NA
+df[df == -9999] <- NA
+df[df == -7999] <- NA
+
 
 timestamp_cutoff <- as.POSIXct("2025-05-01 14:00", format = "%Y-%m-%d %H:%M", tz = "UTC")
 df <- df %>%
-  filter(TIMESTAMP >= timestamp_cutoff)
+  dplyr::filter(TIMESTAMP >= timestamp_cutoff)
 
 
 # Create a complete sequence of timestamps at 30-minute intervals
@@ -64,9 +71,7 @@ tsdf <- data.frame(TIMESTAMP = seq(
   by = 60*30
 ))
 
-# Replace specific missing value indicators with NA
-df[df == -9999] <- NA
-df[df == -7999] <- NA
+
 
 df = merge(tsdf,df,by = 'TIMESTAMP',all.x = T)
 
@@ -78,7 +83,7 @@ names(df) <- gsub("^([A-Za-z]+)_(?:[0-9_]+_)?([0-9]+_[0-9]+_[0-9]+)$", "\\1_\\2"
 ```
 
 ```{r, warning=FALSE}
-biomet_dates <- c('2025-09-01', '2025-10-01')
+biomet_dates <- c('2025-05-01', '2025-10-01')
 #biomet_dates <- c('2024-10-30', '2024-12-01')
 ```
 
@@ -150,7 +155,8 @@ ggplot(data = df)+
                      expression ('Barometric Pressure ('*kPa*')'))
 #  scale_x_datetime(limits = as.POSIXct(biomet_dates))
 
-df$air_pressure = ifelse(df$air_pressure > 97000,df$air_pressure/1000,df$air_pressure)
+#df$air_pressure = ifelse(df$air_pressure > 97000,df$air_pressure/1000,df$air_pressure)
+df$air_pressure = ifelse(df$air_pressure > 87000, df$air_pressure / 1000, df$air_pressure)
 
 ggplot(data = df)+
   geom_point(aes(TIMESTAMP,air_pressure),col='black')+
@@ -162,7 +168,7 @@ df$air_pressure = ifelse(df$air_pressure > 150,df$air_pressure/10,df$air_pressur
 
 ggplot(data = df)+
   geom_point(aes(TIMESTAMP,air_pressure),col='black')+
-  scale_y_continuous(limits = c(90,110),
+  scale_y_continuous(limits = c(80,110),
                      expression ('Barometric Pressure ('*kPa*')'))
 ```
 
@@ -416,7 +422,7 @@ ggplot(df)+geom_hline(yintercept = 0)+
 ```{r, warning=FALSE}
 
 #adjust this value (N) to tweak how many MADs to be away from the norm
-N = 4 
+N = 3
 
 #Add clean value to dataframe (_.c)
 
@@ -646,7 +652,7 @@ ggplot(df)+geom_hline(yintercept = 0)+
 
 ```{r, warning=FALSE}
 #adjust this value (N) to tweak how many MADs to be away from the norm
-N = 3
+N = 5
 
 #Add clean value to dataframe (_.c)
 
@@ -991,9 +997,9 @@ ggplot(data = df)+ theme_bw()+
   geom_hline(yintercept = 0)+
   geom_line(aes(TIMESTAMP,TS_1_1_1.c,color='15_1 cm'))+
   geom_line(aes(TIMESTAMP,TS_2_1_1.c,color='15_2 cm'))+
-  geom_line(aes(TIMESTAMP,TS_2_2_1.c,color='15_3 cm'))+
+  geom_line(aes(TIMESTAMP,TS_2_2_1.c,color='15_3 cm'))
   
-  scale_x_datetime(biomet_dates)
+ # scale_x_datetime(biomet_dates)
 ```
 
 

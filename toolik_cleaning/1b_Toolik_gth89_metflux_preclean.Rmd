@@ -1,0 +1,67 @@
+---
+title: "1b_Toolik_gth89_preclean"
+author: "Kaj"
+date: "2025-10-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+rm(list = ls())
+
+library(data.table)
+library(plyr)
+library(ggplot2)
+library(cowplot)
+library(openair)
+library(viridis)
+library(dplyr)
+library(lubridate)
+```
+
+## WORK IN PROGRESS  ####
+
+
+#here we are pulling air pressure and adding it to the met file
+```{r, warning=FALSE}
+
+dfa = read.csv('C:/Users/klynoe/Documents/toolik/R_outputs/fluxes_merged_2025_until_09.csv')
+
+met = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
+
+h = fread("C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat",skip=1, nrows = 0 , na.strings = c('-9999','NA','NaN','NAN','-7999'))
+
+names(met) = names(h)
+
+met$ts = met$TIMESTAMP
+
+met$ts <- as.POSIXct(met$ts, format = "%Y-%m-%d %H:%M", tz = "UTC")
+df$ts <- as.POSIXct(df$ts, format = "%Y-%m-%d %H:%M", tz = "UTC")
+
+setDT(df) 
+df_sub <- df[, .(ts, air_pressure)]
+
+setDT(met)
+setDT(df_sub)
+
+met <- merge(met, df_sub, by = "ts", all.x = TRUE)
+
+write.csv(met, 'C:/Users/klynoe/Documents/toolik/R_outputs/gth89_biomet_1b.csv',row.names = F)
+
+
+
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

@@ -60,7 +60,7 @@ df = merge(ts,df,by = 'ts',all.x = T)
 
 
 #save off flux data
-write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/fluxes_merged_2025_until_08.csv',row.names = F)
+write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/fluxes_merged_2025_until_09.csv',row.names = F)
 
 
 ################
