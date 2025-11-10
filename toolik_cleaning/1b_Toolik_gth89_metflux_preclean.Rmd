@@ -38,17 +38,19 @@ names(met) = names(h)
 met$ts = met$TIMESTAMP
 
 met$ts <- as.POSIXct(met$ts, format = "%Y-%m-%d %H:%M", tz = "UTC")
-df$ts <- as.POSIXct(df$ts, format = "%Y-%m-%d %H:%M", tz = "UTC")
+dfa$ts <- as.POSIXct(dfa$ts, format = "%Y-%m-%d %H:%M", tz = "UTC")
 
-setDT(df) 
-df_sub <- df[, .(ts, air_pressure)]
+setDT(dfa) 
+df_sub <- dfa[, .(ts, air_pressure)]
 
 setDT(met)
 setDT(df_sub)
 
 met <- merge(met, df_sub, by = "ts", all.x = TRUE)
+comb = merge(met, dfa, by = "ts", all.x = T)
 
 write.csv(met, 'C:/Users/klynoe/Documents/toolik/R_outputs/gth89_biomet_1b.csv',row.names = F)
+write.csv(comb, 'C:/Users/klynoe/Documents/toolik/R_outputs/gth89_biomet_flux.csv',row.names = F )
 
 
 

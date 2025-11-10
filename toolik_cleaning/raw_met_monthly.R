@@ -5,19 +5,18 @@ library(zoo)
 library(stringr)
 library(plyr)
 library(dplyr)
-
+library(tidyr)
+library(purrr)
 
 
 #LOAD AND SPLIT ALLBIOMET AND ALLLOGGER FOR BUCKET UPLOAD#
 #ALL LOGGER 
 
-df = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/toolik-gth89-AllLogger.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
+df2 = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllLogger.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
+df1 = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllLogger_until20251027.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
+h = fread("C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllLogger.dat",skip=1, nrows = 0 , na.strings = c('-9999','NA','NaN','NAN','-7999'))
 
-h = fread("C:/Users/klynoe/Documents/toolik/raw_data/toolik-gth89-AllLogger.dat",skip=1, nrows = 0 , na.strings = c('-9999','NA','NaN','NAN','-7999'))
-
-#df = fread('C:/Users/klynoe/Documents/resolute_bay/R_outputs/resolute_bay_met_merged.csv', header = T
-#, na.strings = c('-9999','NA','NaN','NAN','-7999'))
-
+df = merge(df1,df2, all=T)
 
 names(df) = names(h)
 
@@ -28,10 +27,24 @@ df = df[!duplicated(df$TIMESTAMP),]
 df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, tz = "UTC")
 
 timestamp_cutoff <- as.POSIXct("2025-05-01 14:00", format = "%Y-%m-%d %H:%M", tz = "UTC")
+df <- df %>%
+  dplyr::filter(TIMESTAMP >= timestamp_cutoff)
+
+
+# Create a complete sequence of timestamps at 30-minute intervals
+tsdf <- data.frame(TIMESTAMP = seq(
+  from = min(df$TIMESTAMP),
+  to = max(df$TIMESTAMP),
+  by = 60*30
+))
+
+
+df = merge(tsdf,df,by = 'TIMESTAMP',all.x = T)
 
 
 base_path = "C:/Users/klynoe/Documents/toolik/R_outputs/met/"
 
+met=df
 
 met <- met %>%
   mutate(
@@ -67,14 +80,11 @@ walk2(
 
 #ALL BIOMET#
 
-df = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/toolik-gth89-AllBiomet.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
+df1 = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
+df2 = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet_until20251027.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
+h = fread("C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat",skip=1, nrows = 0 , na.strings = c('-9999','NA','NaN','NAN','-7999'))
 
-h = fread("C:/Users/klynoe/Documents/toolik/raw_data/toolik-gth89-AllBiomet.dat",skip=1, nrows = 0 , na.strings = c('-9999','NA','NaN','NAN','-7999'))
-
-#df = fread('C:/Users/klynoe/Documents/resolute_bay/R_outputs/resolute_bay_met_merged.csv', header = T
-#, na.strings = c('-9999','NA','NaN','NAN','-7999'))
-
-
+df = merge(df1,df2, all=T)
 names(df) = names(h)
 
 #df = rbind.fill(df,met)
@@ -84,9 +94,24 @@ df = df[!duplicated(df$TIMESTAMP),]
 df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, tz = "UTC")
 
 timestamp_cutoff <- as.POSIXct("2025-05-01 14:00", format = "%Y-%m-%d %H:%M", tz = "UTC")
+df <- df %>%
+  dplyr::filter(TIMESTAMP >= timestamp_cutoff)
+
+
+# Create a complete sequence of timestamps at 30-minute intervals
+tsdf <- data.frame(TIMESTAMP = seq(
+  from = min(df$TIMESTAMP),
+  to = max(df$TIMESTAMP),
+  by = 60*30
+))
+
+
+df = merge(tsdf,df,by = 'TIMESTAMP',all.x = T)
+
 
 base_path = "C:/Users/klynoe/Documents/toolik/R_outputs/met/"
 
+met=df
 
 met <- met %>%
   mutate(
