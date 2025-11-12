@@ -145,3 +145,30 @@ for (col in names(df.c)[-which(names(df.c) == "TIMESTAMP")]) {
 }
 
 ```
+
+
+to print and save all in a .pdf
+```{r}
+setwd('C:/Users/klynoe/Documents/toolik/R_outputs/figs')
+
+save_all_plots <- function(df) {
+  pdf("all_cleaned_plots.pdf", width = 10, height = 8)
+  
+  for (col in names(df)[names(df) != "TIMESTAMP"]) {
+    col_name <- gsub("\\.c$", "", col)
+    
+    gg <- ggplot(df, aes(x = TIMESTAMP, y = .data[[col]])) +
+      geom_point() +
+      scale_x_datetime(name = "Date") +
+      scale_y_continuous(name = col_name) +
+      ggtitle(paste("Plot of cleaned", col_name))
+    
+    print(gg)
+  }
+  
+  dev.off()
+}
+
+save_all_plots(df.c)
+
+```
