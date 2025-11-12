@@ -60,14 +60,14 @@ df = merge(ts,df,by = 'ts',all.x = T)
 
 
 #save off flux data
-write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/fluxes_merged_2025_until_09.csv',row.names = F)
+write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202510.csv',row.names = F)
 
 
 ################
 ####SINGLE FILE EDDYPRO PREPARATION####
 ####################################
 
-fp = 'C:/Users/klynoe/Documents/pond_inlet/eddypro/full_output/2025/05/'### CHANGE MONTH TO WHICH YOU WANT TO LOAD
+fp = fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/2025'### CHANGE MONTH TO WHICH YOU WANT TO LOAD
 file = list.files(path = fp,pattern = '*full_output.+csv$',recursive = T,full.names = T)
 
 
