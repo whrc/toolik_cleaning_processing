@@ -87,16 +87,47 @@ plot(df$qc_co2_flux, df$co2_flux.flag)
 combine energy fluxes by met and flux components
 
 ```{r}
-df$met = (df$LWIN_6_14_1_1_1.c + df$SWIN_6_10_1_1_1.c) - (df$LWOUT_6_15_1_1_1.c + df$SWOUT_6_11_1_1_1.c)
+df$met = ((df$LWIN_6_14_1_1_1.c + df$SWIN_6_10_1_1_1.c) -
+         (df$LWOUT_6_15_1_1_1.c + df$SWOUT_6_11_1_1_1.c)) -
+        ((df$SHF_6_37_1_1_1.c + df$SHF_6_37_2_1_1.c)/2)
 df$flux = df$H + df$LE
-
 plot(df$met, df$flux)
-
-plot(df$met, df$flux,
-     ylim = c(-500, 500),
-abline(0, 1, col = "red"))
-
-#add better plot here! with 1:1 line and better axis ratio
+# Fit linear model
+mod = lm(flux ~ met, data = df)
+summary_mod = summary(mod)
+# Extract slope and R²
+slope = coef(mod)["met"]
+r2 = summary_mod$r.squared
+cat("Slope:", slope, "\nR²:", r2, "\n")
+# Define axis limits
+x_min = -200
+x_max = 500
+y_min = -200
+y_max = 500
+# 1:1 line segment clipped to these limits
+line_start = max(x_min, y_min)
+line_end = min(x_max, y_max)
+# Plot
+ggplot(df, aes(x = met, y = flux)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", color = "blue", se = FALSE) +
+  geom_segment(aes(x = line_start, y = line_start,
+                   xend = line_end, yend = line_end),
+               linetype = "dotted", color = "gray40") +
+  geom_hline(yintercept = 0, linetype = "solid", color = "black") +
+  geom_vline(xintercept = 0, linetype = "solid", color = "black") +
+  coord_fixed(ratio = 1, xlim = c(x_min, x_max), ylim = c(y_min, y_max)) +
+  labs(
+    x = expression("Rn - G  (W·m"^-2*")"),
+    y = expression("H + LE  (W·m"^-2*")")
+  ) +
+  annotate(
+    "text",
+    x = x_max, y = y_min,
+    label = paste0("Slope = ", round(slope, 3), "\nR² = ", round(r2, 3)),
+    hjust = 1.1, vjust = -0.5, size = 4
+  ) +
+  theme_bw()
 
 ```
 
