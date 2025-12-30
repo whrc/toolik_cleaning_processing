@@ -73,7 +73,7 @@ summary(df)
 ```
 
 ```{r, warning=FALSE}
-biomet_dates <- c('2025-05-01', '2025-11-01')
+biomet_dates <- c('2025-05-01', '2025-12-01')
 #biomet_dates <- c('2024-10-30', '2024-12-01')
 ```
 
@@ -531,9 +531,9 @@ ggplot(data = df)+ theme_bw()+
 # Volumetric Water Content
 ```{r, warning=FALSE}
 ggplot(data = df)+
-  geom_point(aes(TIMESTAMP, SWC_12_36_1_1_1*100,col='SWC 1'))+
-  geom_point(aes(TIMESTAMP, SWC_12_36_2_1_1*100,col='SWC 2'))+
-  geom_point(aes(TIMESTAMP, SWC_12_36_3_1_1*100,col='SWC 3'))+
+  geom_point(aes(TIMESTAMP, SWC_12_36_1_1_1*100,col='SWC 8cm'))+
+  geom_point(aes(TIMESTAMP, SWC_12_36_2_1_1*100,col='SWC 18cm'))+
+  geom_point(aes(TIMESTAMP, SWC_12_36_3_1_1*100,col='SWC 28cm'))+
   scale_y_continuous(limits = c(0,100),
                      expression('% VWC'))+
   scale_x_datetime(limits = as.POSIXct(biomet_dates))
@@ -547,7 +547,7 @@ df$SWC_12_36_3_1_1.c = df$SWC_12_36_3_1_1
 # Save
 
 ```{r, warning=FALSE}
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/met/met_c_202505_202510.csv',row.names = F,quote = T)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/met/met_c_202505_202511.csv',row.names = F,quote = T)
 
 ```
 

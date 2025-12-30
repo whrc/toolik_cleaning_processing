@@ -35,9 +35,9 @@ Load in eddypro output files
 
 ```{r warning=FALSE}
 
-met = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/met_c_202505_202510.csv')
+met = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/met_c_202505_202511.csv')
 
-df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202510.csv')
+df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202511.csv')
 #df = fread("C:/Users/klynoe/Documents/toolik/eddypro_output/2025/09/eddypro_09_25_full_output_2025-10-06T120635_adv.csv", skip = 3, header = F, na.strings = c('-9999','NA','NaN','NAN','-7999'))
 #h = fread("C:/Users/klynoe/Documents/toolik/eddypro_output/2025/09/eddypro_09_25_full_output_2025-10-06T120635_adv.csv",skip = 1,nrows = 0)
 
@@ -65,7 +65,7 @@ summary(df)
 #Creates a variable to input a date range for the plots in the flux section of
 #cleaning code. Used to easily change date range for different data sets. 
 ```{r, warning=FALSE}
-flux_dates <- c("2025-05-01",'2025-11-01')
+flux_dates <- c("2025-05-01",'2025-12-01')
 ```
 
 #Create Flags
@@ -522,7 +522,7 @@ adjust this (N) to tweak how many MADs to be away from the norm, CH4 deserves mo
 
 
 ```{r, warning=FALSE}
-N = 4
+N = 4 #8
 
 df$ch4_flux.c = ifelse(abs(ch4fluxclean - Flux_filt) > (N * roll.mad),NA,ch4fluxclean)
 
@@ -895,7 +895,7 @@ ggplot(data = diel)+geom_hline(yintercept = 0)+
 ```{r, warning=FALSE}
 df <- df[!duplicated(df$TIMESTAMP), ]
 
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/toolik_flux_met_c_202505_202510.csv',row.names = F,quote = F)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/toolik_flux_met_c_202505_202511.csv',row.names = F,quote = F)
 ```
 
 #NEST AND SPLIT THE DATA BY MONTH AND SAVE IN DESIRED DIRECTORY

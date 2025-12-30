@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = 'C:/Users/dtrangmoe/Documents/github/churchill_cleaning_processing') #use this to set your directory
+knitr::opts_knit$set(root.dir = 'C:/Users/klynoe\Documents/pp github reps/toolik_cleaning_processing') #use this to set your directory
 ```
 
 
@@ -43,8 +43,6 @@ df <- fread('./outputs/cleaning/Churchill_fluxes_merged_2025.csv')
 
 df$TIMESTAMP = df$ts
 
-#Adjustment here
-df$TIMESTAMP <- as.POSIXct(ifelse(df$TIMESTAMP >= as.POSIXct("2025-05-01 23:30:00") & df$TIMESTAMP <= as.POSIXct("2025-06-28 23:30:00"), df$TIMESTAMP+6*3600, df$TIMESTAMP)) 
 
 #Merge here
 df= merge(df,met,by='TIMESTAMP',all = T)
@@ -65,9 +63,6 @@ rm(met, tsdf)
 
 #adjust timezone from UTC to CST
 
-df$TIMESTAMP <- as.POSIXct(ifelse(df$TIMESTAMP <= as.POSIXct("2025-06-28 23:30:00"), df$TIMESTAMP-6*3600, df$TIMESTAMP)) 
-#Remove problematic chunk
-df <- dplyr::filter(df, !(df$TIMESTAMP >= as.POSIXct("2025-02-26 18:00:00") & df$TIMESTAMP <= as.POSIXct("2025-03-03 18:00:00")))
 
 #Refill timestamp to ensure full timeseries
 #check time stamps to ensure we have a complete series
