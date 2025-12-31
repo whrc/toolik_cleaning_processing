@@ -8,7 +8,7 @@ date: "2023-2-5"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,dev = 'png')
-knitr::opts_knit$set(root.dir = 'C:/Users/klynoe/Documents/pond_inlet/gapfill/') #use this to set your directory
+knitr::opts_knit$set(root.dir = 'C:/Users/klynoe/Documents/toolik/gapfill/') #use this to set your directory
 ```
 
 
@@ -27,7 +27,7 @@ Sys.setenv(TZ = 'UTC')
 
 Load in data
 ```{r,error=FALSE,warning=FALSE}
-cf = fread('./pond_inlet_2024_era.csv')
+cf = fread('./toolik_2025_era.csv')
 #cf = cf[complete.cases(cf$temperature_2m),]
 cf = cf[complete.cases(cf$airt.eramod),]
 
@@ -213,7 +213,7 @@ summary(lm(test.data$ch4_flux.c ~ test.data$rfch4))
 ```{r}
 # png("C:/Users/karndt.WHRC/Desktop/sites/churchill/figures/rf_validations.png",width = 5,height = 3,units = 'in',res = 1500)
 
-png("C:/Users/klynoe/Documents/pond_inlet/figs/rf_validations.png",width = 5,height = 3,units = 'in',res = 1500)
+png("C:/Users/klynoe/Documents/toolik/figs/rf_validations.png",width = 5,height = 3,units = 'in',res = 1500)
 plot_grid(co2.rf,ch4.rf)
 dev.off()
 ```
@@ -223,5 +223,5 @@ dev.off()
 
 save off the data
 ```{r,error=FALSE,warning=FALSE}
-write.csv(x = cf,file = "./pond_inlet_2024_gf.csv",quote = F,row.names = F)
+write.csv(x = cf,file = "./toolik_2025_gf.csv",quote = F,row.names = F)
 ```

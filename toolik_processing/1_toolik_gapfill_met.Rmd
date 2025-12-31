@@ -1,5 +1,5 @@
 ---
-title: "Prep for Ameriflux - Pond Inlet"
+title: "Prep for Ameriflux - Toolik"
 author: "Kyle Arndt"
 date: "2024-02-15"
 output: html_document
@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = 'C:/Users/klynoe/Documents/pond_inlet/') #use this to set your directory
+knitr::opts_knit$set(root.dir = 'C:/Users/klynoe/Documents/toolik/') #use this to set your directory
 ```
 
 Libraries
@@ -27,8 +27,8 @@ Load Data
 
 #df = rbind(c22,c23,fill=T)
 
-df = fread(input = "C:/Users/klynoe/Documents/pond_inlet/R_outputs/pond_inlet_Flux_Met_Clean_Aug_Nov_24.csv")
-#df = fread(input = "C:/Users/karndt.WHRC/Documents/GitHub/pondinlet_cleaning_processing/data/pond_inlet_Flux_Met_Clean_Aug_Nov_24.csv")
+df = fread(input = "C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/toolik_flux_met_c_202505_202510.csv")
+#df = fread(input = "C:/Users/karndt.WHRC/Documents/GitHub/pondinlet_cleaning_processing/data/toolik_Flux_Met_Clean_Aug_Nov_24.csv")
 
 #df$ts = df$ts-6*3600 #adjust timezone from UTC to CST
 
@@ -102,13 +102,13 @@ df$TS_2_38_3_9_1.c  = na.spline(df$TS_2_38_2_9_1.c,maxgap = gap)
 summary(df$RH.c) #check on the data coverage after filling small gaps
 
 #save off a copy of the newly merged data
-write.csv(x = df,file = "gapfill/met_gf_pond_inlet_2024.csv",row.names = F)
+write.csv(x = df,file = "gapfill/met_gf_toolik_2025.csv",row.names = F)
 ```
 
 Add ERA5 data
 ```{r}
 #load in era5 data for pond inlet for continuous met data (found in Ameriflux folder in bucket)
-era = fread('gapfill/ERA5_pond_inlet.csv')
+era = fread('gapfill/ERA5_toolik.csv')
 
 #rename to match up timestamps and merge datasets
 df$date = df$ts
@@ -307,14 +307,14 @@ ggplot(data = all,aes(vpd,VPD))+theme_bw()+
   geom_abline(slope = 1,intercept = 0,col='red',lty=2)
 ```
 
-#reduce down to pond inlet size and add to final data set
+#reduce down to toolik size and add to final data set
 ```{r}
 eras = all[,c('date','rh.eramod','airt.eramod','ws.eramod','rad.eramod','tsoil.eramod','le.eramod','h.eramod','pres.eramod')]
 
 df = df[!duplicated(df$date),]
 df = merge(df,eras,by = 'date',all.x = T)
 
-write.csv(x = df,file = './pond_inlet_2024_era.csv',row.names = F,quote = F)
+write.csv(x = df,file = './toolik_2025_era.csv',row.names = F,quote = F)
 
 #calculate VPD from air t and RH
 svp = 610.7*10^((7.5*all$airt)/(237.3+all$airt))
@@ -408,7 +408,7 @@ swc = ggplot(data = all,aes(vwc1*100,SWC_12_36_2_1_1))+theme_bw()+
 ```
 
 ```{r}
-png(filename = 'C:/Users/klynoe/Documents/pond_inlet/figs/era5_pond_inlet_comparisons.png',width = 6,height = 4,units = 'in',res = 1500)
+png(filename = 'C:/Users/klynoe/Documents/toolik/figs/era5_toolik_comparisons.png',width = 6,height = 4,units = 'in',res = 1500)
 plot_grid(airt,rh,ws,rad,tsoil,le,h,vpd,swc)
 dev.off()
 ```
