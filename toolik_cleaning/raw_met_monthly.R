@@ -168,6 +168,8 @@ met=df
 met <- met %>%
   mutate(TIMESTAMP = as.POSIXct(TIMESTAMP, tz = "UTC"))
 
+######FOR EDDYPRO BIOMET SKIP NESTING AND SPLITTING!!!####
+
 # -----------------------------
 # Nest by year_month and prepare file paths
 # -----------------------------
@@ -192,8 +194,55 @@ walk2(
     write.csv(.x, .y, row.names = FALSE)
   }
 )
+#########PRINT FULL BIOMET WITH UNITS#####
 
+#1# GET RID OF THE RECORD ROW (COL2) set time
 
+met = met [,-2]
+
+met$TIMESTAMP <- format(
+  as.POSIXct(met$TIMESTAMP, tz = "UTC"),"%Y-%m-%d %H:%M")
+
+#2# add units
+
+units <- c(
+  "yyyy-mm-dd HH:MM",  # TIMESTAMP etc
+  "degC",
+  "%",
+  "m/s",
+  "W/m^2",
+  "W/m^2",
+  "m",
+  "umol/s/m^2",
+  "umol/s/m^2",
+  "W/m^2",
+  "W/m^2",
+  "W/m^2",
+  "W/m^2",
+  "W/m^2",
+  "W/m^2",
+  "m^3/m^3",
+  "m^3/m^3",
+  "m^3/m^3",
+  "degC",
+  "degC",
+  "degC"
+)
+
+#3# check alignement
+
+length(units) == ncol(met)
+
+#4# make row and bind to met
+
+units_row <- as.data.frame(t(units), stringsAsFactors = FALSE)
+names(units_row) <- names(met)
+met_out <- rbind(units_row, met)
+
+#5# save
+base_path = "C:/Users/klynoe/Documents/toolik/R_outputs/met/"
+
+write.csv(met_out, "toolik-gth89-AllBiomet_1.csv", row.names = FALSE)
 
 
 
