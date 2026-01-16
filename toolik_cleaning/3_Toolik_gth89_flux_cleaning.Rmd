@@ -35,9 +35,9 @@ Load in eddypro output files
 
 ```{r warning=FALSE}
 
-met = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/met_c_202505_202511.csv')
+met = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202505_202512.csv')
 
-df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202511.csv')
+df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202512.csv')
 #df = fread("C:/Users/klynoe/Documents/toolik/eddypro_output/2025/09/eddypro_09_25_full_output_2025-10-06T120635_adv.csv", skip = 3, header = F, na.strings = c('-9999','NA','NaN','NAN','-7999'))
 #h = fread("C:/Users/klynoe/Documents/toolik/eddypro_output/2025/09/eddypro_09_25_full_output_2025-10-06T120635_adv.csv",skip = 1,nrows = 0)
 
@@ -61,11 +61,14 @@ summary(df)
 
 ```
 
+```{r, warning=FALSE}
+df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202505_202512.csv')
+```
 
 #Creates a variable to input a date range for the plots in the flux section of
 #cleaning code. Used to easily change date range for different data sets. 
 ```{r, warning=FALSE}
-flux_dates <- c("2025-05-01",'2025-12-01')
+flux_dates <- c("2025-05-01",'2025-12-16')
 ```
 
 #Create Flags
@@ -326,7 +329,7 @@ df$nightCO2 = co2_flux.limits
 df$nightCO2 = replace(df$nightCO2,df$SWIN_6_10_1_1_1 > 5,NA)
 
 Uthreshold=0.05
-ggplot(data = df,aes(`u*`,nightCO2))+
+ggplot(data = df,aes(`u.`,nightCO2))+
   ylab(expression(paste("Flux (g-C", ~CO[2], ~"m",""^"-2","d",""^"-1",")")))+
   geom_point()+xlab("U*")+
   scale_x_continuous(limits = c(0,1))+
@@ -407,7 +410,7 @@ now filter the data based on this signal
 
 ```{r, warning=FALSE}
 #adjust this value (N) to tweak how many MADs to be away from the norm
-N =3
+N = 5
 
 #Add clean value to dataframe (_.c)
 
@@ -522,7 +525,7 @@ adjust this (N) to tweak how many MADs to be away from the norm, CH4 deserves mo
 
 
 ```{r, warning=FALSE}
-N = 4 #8
+N = 8 #8
 
 df$ch4_flux.c = ifelse(abs(ch4fluxclean - Flux_filt) > (N * roll.mad),NA,ch4fluxclean)
 
@@ -649,7 +652,7 @@ ggplot(df)+geom_hline(yintercept = 0)+
 Now filter the data based on this signal (N) adjust this to tweak how many MADs to be away from the norm, add clean value to dataframe (_.c) and Compare Clean vs. Uncleaned
 
 ```{r, warning=FALSE}
-N = 3
+N = 4
 
 df$H.c = ifelse(abs(Hclean - Flux_filt) > (N * roll.mad),NA,Hclean)
 
@@ -895,7 +898,7 @@ ggplot(data = diel)+geom_hline(yintercept = 0)+
 ```{r, warning=FALSE}
 df <- df[!duplicated(df$TIMESTAMP), ]
 
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/toolik_flux_met_c_202505_202511.csv',row.names = F,quote = F)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/toolik_flux_c_met_c_202505_202512.csv',row.names = F,quote = F)
 ```
 
 #NEST AND SPLIT THE DATA BY MONTH AND SAVE IN DESIRED DIRECTORY

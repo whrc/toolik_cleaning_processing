@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = 'C:/Users/klynoe\Documents/pp github reps/toolik_cleaning_processing') #use this to set your directory
+knitr::opts_knit$set(root.dir = 'C:/Users/klynoe/Documents/pp github reps/toolik_cleaning_processing') #use this to set your directory
 ```
 
 
@@ -33,8 +33,8 @@ library(bigleaf) # for radiation check
 Load data
 ```{r}
 
-met <- fread('./outputs/cleaning/Churchill_met_merged_2025.csv')
-df <- fread('./outputs/cleaning/Churchill_fluxes_merged_2025.csv')
+met <- fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik-gth89-AllBiomet.csv')
+df <- fread('C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202512.csv')
 
 ```
 
@@ -42,7 +42,7 @@ df <- fread('./outputs/cleaning/Churchill_fluxes_merged_2025.csv')
 ```{r}
 
 df$TIMESTAMP = df$ts
-
+met$TIMESTAMP = as.POSIXct(met$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
 
 #Merge here
 df= merge(df,met,by='TIMESTAMP',all = T)
@@ -57,45 +57,29 @@ rm(met, tsdf)
 
 ```
 
-## Align merged datasets here
-
-```{r}
-
-#adjust timezone from UTC to CST
-
-
-#Refill timestamp to ensure full timeseries
-#check time stamps to ensure we have a complete series
-TIMESTAMP = seq(from = min(df$TIMESTAMP), to = max(df$TIMESTAMP),by = 60*30,tz = "UTC")
-tsdf = as.data.frame(TIMESTAMP)
-
-df = merge(tsdf,df,by = "TIMESTAMP",all = T)
-
-
-```
-
-
 
 # Radiation timestamp alignment check
 
 Create potential radiation dataset
 ```{r}
-TIMESTAMP <- as.POSIXct(seq(from = as.POSIXct('2025-01-01 00:00', tz = 'UTC'),
-                           to = as.POSIXct('2025-10-01 00:00', tz = 'UTC'),
+mindate = as.POSIXct(min(df$TIMESTAMP), tz = "UTC")
+maxdate = as.POSIXct(max(df$TIMESTAMP), tz = "UTC")
+  
+TIMESTAMP <- as.POSIXct(seq(from = mindate,
+                           to = maxdate,
                            by = 60*30),'yyyy-mm-dd HH:MM:SS', tz = 'UTC')
-
-JD <- as.numeric(format(seq(from = as.POSIXct('2025-01-01 00:00', tz = 'UTC'),
-                           to = as.POSIXct('2025-10-01 00:00', tz = 'UTC'),
+JD <- as.numeric(format(seq(from = mindate,
+                           to = maxdate,
                            by = 60*30),'%j'))
-h <- as.numeric(format(seq(from = as.POSIXct('2025-01-01 00:00', tz = 'UTC'),
-                           to = as.POSIXct('2025-10-01 00:00', tz = 'UTC'),
+h <- as.numeric(format(seq(from = mindate,
+                           to = maxdate,
                            by = 60*30),'%H'))
-m <- as.numeric(format(seq(from = as.POSIXct('2025-01-01 00:00', tz = 'UTC'),
-                          to = as.POSIXct('2025-10-01 00:00', tz = 'UTC'),
+m <- as.numeric(format(seq(from = mindate,
+                          to = maxdate,
                           by = 60*30),'%M'))
 H <- h+ifelse(m == 30,0.5,0)
 
-rpot <- potential.radiation(doy = JD,hour = H,latDeg = 59,longDeg = -94,timezone = -6,useSolartime = F)*1.1
+rpot <- potential.radiation(doy = JD,hour = H,latDeg = 74.7,longDeg = -94.9,timezone = -6,useSolartime = F)*1.1
 
 rpot <- as.data.frame(cbind(TIMESTAMP, rpot))
 
@@ -400,7 +384,7 @@ ggplot(data = df)+
 # Write aligned CSV file
 ```{r}
 
-write.csv(x = df,file = './outputs/cleaning/Churchill_met_flux_merged_aligned_2025.csv',row.names = F,quote = F)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/toolik_met_flux_merged_aligned_2025.csv',row.names = F,quote = F)
 
 ```
 
