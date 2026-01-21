@@ -35,28 +35,28 @@ Load in eddypro output files
 
 ```{r warning=FALSE}
 
-met = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202505_202512.csv')
+#met = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202505_202512.csv')
 
-df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202512.csv')
+#df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202512.csv')
 #df = fread("C:/Users/klynoe/Documents/toolik/eddypro_output/2025/09/eddypro_09_25_full_output_2025-10-06T120635_adv.csv", skip = 3, header = F, na.strings = c('-9999','NA','NaN','NAN','-7999'))
 #h = fread("C:/Users/klynoe/Documents/toolik/eddypro_output/2025/09/eddypro_09_25_full_output_2025-10-06T120635_adv.csv",skip = 1,nrows = 0)
 
 #names(df) = names(h)
 
-df$TIMESTAMP = paste(df$date, df$time)
-df$TIMESTAMP = as.POSIXct(df$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
-met$TIMESTAMP = as.POSIXct(met$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
+#df$TIMESTAMP = paste(df$date, df$time)
+#df$TIMESTAMP = as.POSIXct(df$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
+#met$TIMESTAMP = as.POSIXct(met$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
 
 
-df= merge(df,met,by='TIMESTAMP',all = T)
+#df= merge(df,met,by='TIMESTAMP',all = T)
 
 #check time stamps to ensure we have a complete series
-TIMESTAMP = seq(from = min(df$TIMESTAMP), to = max(df$TIMESTAMP),by = 60*30,tz = "UTC")
-tsdf = as.data.frame(TIMESTAMP)
+#TIMESTAMP = seq(from = min(df$TIMESTAMP), to = max(df$TIMESTAMP),by = 60*30,tz = "UTC")
+#tsdf = as.data.frame(TIMESTAMP)
 
-df = merge(tsdf, df, by = "TIMESTAMP", all = T)
+#df = merge(tsdf, df, by = "TIMESTAMP", all = T)
 
-summary(df)
+#summary(df)
 
 
 ```
@@ -158,7 +158,7 @@ ggplot(data = df)+ theme_bw()+ geom_abline(intercept = 1,color='blue')+
   geom_point(aes(met,flux,color=mismatch.limits))+
   scale_x_continuous(limits = c(-200,600))+
   scale_y_continuous(limits = c(-200,600))+
-  scale_color_viridis()
+  scale_color_viridis_b()
     
 plot(df$met,df$flux, abline(0, 1, col= 'blue'))
 ```
@@ -227,10 +227,18 @@ plot(df$ts,co2_flux.qc,ylim = c(-25,25));abline(h=15, col= 'red');abline(h=-15, 
 Clean based on graphs, create new variable (co2_flux.limits), and see cleaned product
 
 ```{r, warning=FALSE}
+
 co2_flux.limits = replace(df$co2_flux,(df$co2_flux > 20 | df$co2_flux < -20) & df$TIMESTAMP >= '2025-05-01' | (df$co2_flux > 20 | df$co2_flux < -20),NA)
 
-# Make .flag = 3 everywhere where cleaning is done via absolute limits
-df$co2_flux.flag <- ifelse(is.na(co2_flux.limits) & !is.na(df$co2_flux) & df$co2_flux.flag != 2, 3, df$co2_flux.flag)
+upper_limit <- 20
+lower_limit <- -20
+
+limit_fail <- df$co2_flux > upper_limit | df$co2_flux < lower_limit
+
+df$co2_flux.flag[limit_fail & df$co2_flux.flag != 2] <- 3
+co2_flux.limits <- df$co2_flux
+co2_flux.limits[limit_fail] <- NA
+
 
 
 plot(df$ts,co2_flux.limits,ylim = c(-25,25));abline(h=15, col= 'red');abline(h=-15, col='red')
@@ -260,14 +268,24 @@ CH4MOLE = ggplot(data = df)+geom_hline(yintercept = 0)+
   scale_y_continuous(limits = c(0,4))
  
 
-ch4_flux.limits = df$ch4_flux
+# Define absolute limits for CH4
+upper_limit_ch4 <- 0.15
+lower_limit_ch4 <- -0.15
 
-# Make .flag = 3 everywhere where cleaning is done via absolute limits
-df$ch4_flux.flag <- ifelse(is.na(ch4_flux.limits) & !is.na(df$ch4_flux) & df$ch4_flux.flag != 2, 3, df$ch4_flux.flag)
-         
-                                        
-hist(ch4_flux.limits,breaks = 100)
-plot(ch4_flux.limits)
+# Identify points outside limits
+limit_fail_ch4 <- df$ch4_flux > upper_limit_ch4 | df$ch4_flux < lower_limit_ch4
+
+# Assign flag 3 (absolute limits) only if not already flagged as 2
+df$ch4_flux.flag[limit_fail_ch4 & df$ch4_flux.flag != 2] <- 3
+
+# Create a "limited" flux vector for plotting
+ch4_flux.limits <- df$ch4_flux
+ch4_flux.limits[limit_fail_ch4] <- NA
+
+# Quick check
+hist(df$ch4_flux.limits, breaks = 100)
+plot(df$ts, df$ch4_flux.limits)
+
 
 ggplot(data = df)+geom_hline(yintercept = 0)+
   geom_point(aes(x=ts,y=ch4_flux),col = 'red')+
@@ -288,10 +306,17 @@ plot(df$ts,df$H,ylim = c(-250,450));abline(h=-150, col= 'red');abline(h=360, col
 Clean based on graphs, create new variable (H.limits), and see cleaned product
 
 ```{r, warning=FALSE}
-H.limits = replace(df$H, df$H < -150 | df$H > 360,NA)
+# Define absolute limits
+H_upper <- 360
+H_lower <- -150
 
-# Make .flag = 3 everywhere where cleaning is done via absolute limits
-df$H.flag <- ifelse(is.na(H.limits) & !is.na(df$H) & df$H.flag != 2, 3, df$H.flag)
+# Create a "limited" vector for plotting and filtering
+H.limits <- df$H
+H.limits[df$H < H_lower | df$H > H_upper] <- NA
+
+# Assign flag 3 (absolute limits) only if not already flagged as 2
+df$H.flag[is.na(df$H.limits) & !is.na(df$H) & df$H.flag != 2] <- 3
+
 
 hist(H.limits,breaks = 100)
 plot(H.limits)
@@ -311,10 +336,16 @@ plot(df$ts,df$LE,ylim = c(-40,450));abline(h=-40, col= 'red');abline(h=390, col=
 Clean based on graphs, create new variable (H.limits), and see cleaned product
 
 ```{r, warning=FALSE}
-LE.limits = replace(df$LE, df$LE < -40 | df$LE > 390,NA)
+# Define absolute limits
+LE_upper <- 390
+LE_lower <- -40
 
-# Make .flag = 3 everywhere where cleaning is done via absolute limits
-df$LE.flag <- ifelse(is.na(LE.limits) & !is.na(df$LE) & df$LE.flag != 2, 3, df$LE.flag)
+# Create a "limited" vector for plotting and filtering
+LE.limits <- df$LE
+LE.limits[df$LE < LE_lower | df$LE > LE_upper] <- NA
+
+# Assign flag 3 (absolute limits) only if not already flagged as 2
+df$LE.flag[is.na(df$LE.limits) & !is.na(df$LE) & df$LE.flag != 2] <- 3
 
 hist(LE.limits)
 plot(LE.limits)
@@ -420,28 +451,38 @@ df$co2_flux.c = ifelse(abs(co2fluxclean - Flux_filt) > (N * roll.mad),NA,co2flux
 ADD THE FLAGS
 
 ```{r, warning=FALSE}
-df$co2_flux.flag <- ifelse(is.na(df$co2_flux.c) & !is.na(co2fluxclean) & df$co2_flux.flag != 2 & df$co2_flux.flag != 3, 4, df$co2_flux.flag)
+# First, make sure co2_flux.flag is numeric
+df$co2_flux.flag <- as.numeric(df$co2_flux.flag)
 
-df$co2_flux.flag <- as.factor(df$co2_flux.flag)
+# Identify the points to flag as 4 (Rolling MAD or other post-processing)
+# Conditions:
+# 1. co2_flux.c is NA (the filtered value is missing)
+# 2. Original flux exists (co2fluxclean)
+# 3. Not already flagged as 2 (EP QC) or 3 (absolute limits)
+
+flag4_idx <- which(is.na(df$co2_flux.c) & !is.na(co2fluxclean) & !(df$co2_flux.flag %in% c(2,3)))
+
+# Assign flag 4
+df$co2_flux.flag[flag4_idx] <- 4
+
+# Convert to factor with **all expected levels**
+df$co2_flux.flag <- factor(df$co2_flux.flag, levels = c(0,1,2,3,4))
+
+# Check
 summary(df$co2_flux.flag)
 
+# Color map
+color_map = c("0" = "yellow3", "1" = "darkblue", "2" = "red4", "3" = "pink3", "4" = "green4")
 
-color_map = c("0" = "yellow3", "1" = "darkblue" , "2" =  "red4", "3" = "pink3", "4" = "green4")
-
-ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,co2_flux,color = co2_flux.flag))+
-  #geom_point(aes(TIMESTAMP,co2_flux.c),col='black')+
-  scale_y_continuous(limits=c(-12,8))+
-  scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
-scale_color_manual(values = color_map, name = "QC CO2 Flux")
-
-ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,co2_flux,color = co2_flux.flag))+
-  geom_point(aes(TIMESTAMP,co2_flux.c),col='black')+
-  scale_y_continuous(limits=c(-12,8))+
-  scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
-scale_color_manual(values = color_map, name = "QC CO2 Flux")
-
+# Plot with flags
+ggplot(df) +
+  geom_hline(yintercept = 0) +
+  geom_point(aes(TIMESTAMP, co2_flux, color = co2_flux.flag)) +
+  # Uncomment if you want to overlay cleaned flux
+  # geom_point(aes(TIMESTAMP, co2_flux.c), col='black') +
+  scale_y_continuous(limits=c(-12,8)) +
+  scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F")) +
+  scale_color_manual(values = color_map, name = "QC CO2 Flux")
 
 ```
 
@@ -541,27 +582,36 @@ ggplot(data = df)+geom_hline(yintercept = 0)+
 Add flag data
 ```{r}
 
-df$ch4_flux.flag <- ifelse(is.na(df$ch4_flux.c) & !is.na(ch4fluxclean) & df$ch4_flux.flag != 2 & df$ch4_flux.flag != 3, 4, df$ch4_flux.flag)
+# --- Assign flag 4 for rolling/MAD cleaned points ---
+df$ch4_flux.flag[is.na(df$ch4_flux.c) & !is.na(ch4fluxclean) & 
+                 df$ch4_flux.flag != 2 & df$ch4_flux.flag != 3] <- 4
 
-df$ch4_flux.flag <- as.factor(df$ch4_flux.flag)
-summary(df$ch4_flux.flag)
+# Convert to factor for plotting
+df$ch4_flux.flag <- factor(df$ch4_flux.flag, levels = c(0,1,2,3,4))
 
+# Define color map
+color_map <- c("0" = "yellow3", "1" = "darkblue", "2" = "red4", 
+               "3" = "pink3", "4" = "green4")
 
-color_map = c("0" = "yellow3", "1" = "darkblue" , "2" =  "red4", "3" = "pink3", "4" = "green4")
+# --- Plot 1: colored by flag, NAs removed ---
+ggplot(data = df[!is.na(df$ch4_flux) & !is.na(df$ch4_flux.flag), ]) +
+  geom_hline(yintercept = 0) +
+  geom_point(aes(TIMESTAMP, ch4_flux, color = ch4_flux.flag)) +
+  scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F")) +
+  scale_color_manual(values = color_map, name = "QC CH4 Flux")
 
-ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,ch4_flux,color = ch4_flux.flag))+
-  #geom_point(aes(TIMESTAMP,ch4_flux.c),col='black')+
-  #scale_y_continuous(limits=c(-12,8))+
-  scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
-scale_color_manual(values = color_map, name = "QC ch4 Flux")
+# --- Plot 2: overlay clean flux in black, NAs removed ---
+ggplot() +
+  geom_hline(yintercept = 0) +
+  # colored points for flagged flux
+  geom_point(data = df[!is.na(df$ch4_flux) & !is.na(df$ch4_flux.flag), ],
+             aes(TIMESTAMP, ch4_flux, color = ch4_flux.flag)) +
+  # black points for cleaned flux
+  geom_point(data = df[!is.na(df$ch4_flux.c), ],
+             aes(TIMESTAMP, ch4_flux.c), col = 'black') +
+  scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F")) +
+  scale_color_manual(values = color_map, name = "QC CH4 Flux")
 
-ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,ch4_flux,color = ch4_flux.flag))+
-  geom_point(aes(TIMESTAMP,ch4_flux.c),col='black')+
-  #scale_y_continuous(limits=c(-12,8))+
-  scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
-scale_color_manual(values = color_map, name = "QC ch4 Flux")
 
 ```
 
@@ -590,32 +640,45 @@ CH4_FALLSOILTCOMP = plot_grid(CH4Filter,CH4RSSI,CH4MOLE,nrow=3,align = 'v')
 #Compare cleaned vs. uncleaned
 ```{r, warning=FALSE}
 
-ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,ch4_flux),col='red')+
-  geom_point(aes(TIMESTAMP,ch4_flux.c),col='black')+
-  scale_y_continuous(limits=c(-.5,.8))+
-    #scale_x_datetime(limits = as.POSIXct(c('2024-09-01','2024-09-12'),format="%F"))
- scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))
+# --- Plot 1: red raw points + black clean, NA-safe ---
+ggplot() +
+  geom_hline(yintercept = 0) +
+  geom_point(data = df[!is.na(df$ch4_flux), ],
+             aes(TIMESTAMP, ch4_flux), col = 'red') +
+  geom_point(data = df[!is.na(df$ch4_flux.c), ],
+             aes(TIMESTAMP, ch4_flux.c), col = 'black') +
+  scale_y_continuous(limits = c(-0.5, 0.8)) +
+  scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F"))
 
-ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,ch4_flux,colour = qc_ch4_flux))+
-  geom_point(aes(TIMESTAMP,ch4_flux.c),col='black')+
-  scale_y_continuous(limits=c(-.5,.8))+
-    #scale_x_datetime(limits = as.POSIXct(c('2024-09-01','2024-09-12'),format="%F"))
- scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))
+# --- Plot 2: colored by raw QC flag + black clean, NA-safe ---
+ggplot() +
+  geom_hline(yintercept = 0) +
+  geom_point(data = df[!is.na(df$ch4_flux) & !is.na(df$qc_ch4_flux), ],
+             aes(TIMESTAMP, ch4_flux, colour = qc_ch4_flux)) +
+  geom_point(data = df[!is.na(df$ch4_flux.c), ],
+             aes(TIMESTAMP, ch4_flux.c), col = 'black') +
+  scale_y_continuous(limits = c(-0.5, 0.8)) +
+  scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F"))
 
-ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,ch4_flux,color = ch4_flux.flag))+
-  scale_y_continuous(limits=c(-.5,.8))+
-  scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
-scale_color_manual(values = color_map, name = "QC CH4 Flux")  
- 
- ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,ch4_flux,color = ch4_flux.flag))+
-  geom_point(aes(TIMESTAMP,ch4_flux.c),col='black')+
-  scale_y_continuous(limits=c(-.5,.8))+
-  scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
-scale_color_manual(values = color_map, name = "QC CH4 Flux")  
+# --- Plot 3: colored by processed flag only, NA-safe ---
+ggplot(data = df[!is.na(df$ch4_flux) & !is.na(df$ch4_flux.flag), ]) +
+  geom_hline(yintercept = 0) +
+  geom_point(aes(TIMESTAMP, ch4_flux, color = ch4_flux.flag)) +
+  scale_y_continuous(limits = c(-0.5, 0.8)) +
+  scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F")) +
+  scale_color_manual(values = color_map, name = "QC CH4 Flux")  
+
+# --- Plot 4: colored by processed flag + black clean overlay, NA-safe ---
+ggplot() +
+  geom_hline(yintercept = 0) +
+  geom_point(data = df[!is.na(df$ch4_flux) & !is.na(df$ch4_flux.flag), ],
+             aes(TIMESTAMP, ch4_flux, color = ch4_flux.flag)) +
+  geom_point(data = df[!is.na(df$ch4_flux.c), ],
+             aes(TIMESTAMP, ch4_flux.c), col = 'black') +
+  scale_y_continuous(limits = c(-0.5, 0.8)) +
+  scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F")) +
+  scale_color_manual(values = color_map, name = "QC CH4 Flux")
+
 ```
 
 ## H
@@ -680,26 +743,31 @@ ggplot(data = df)+
 Add flag data
 ```{r}
 
-df$H.flag <- ifelse(is.na(df$H.c) & !is.na(Hclean) & df$H.flag != 2 & df$H.flag != 3, 4, df$H.flag)
-
-df$H.flag <- as.factor(df$H.flag)
+# --- Assign flag 4 for rolling/MAD cleaned points (NA-safe) ---
+df$H.flag[df$H.flag != 2 & df$H.flag != 3 & is.na(df$H.c) & !is.na(Hclean)] <- 4
+df$H.flag <- factor(df$H.flag, levels = c(0,1,2,3,4))
 summary(df$H.flag)
 
-color_map = c("0" = "yellow3", "1" = "darkblue" , "2" =  "red4", "3" = "pink3", "4" = "green4")
+# Color map
+color_map = c("0" = "yellow3", "1" = "darkblue", "2" = "red4", "3" = "pink3", "4" = "green4")
 
-ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,H,color = H.flag))+
-  #geom_point(aes(TIMESTAMP,H.c),col='black')+
-  #scale_y_continuous(limits=c(-12,8))+
-  scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
-scale_color_manual(values = color_map, name = "QC H Flux")
+# --- Plot 1: H flux colored by flag (NA removed) ---
+ggplot(data = df[!is.na(df$H) & !is.na(df$H.flag), ]) +
+  geom_hline(yintercept = 0) +
+  geom_point(aes(TIMESTAMP, H, color = H.flag)) +
+  scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F")) +
+  scale_color_manual(values = color_map, name = "QC H Flux")
 
-ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,H,color = H.flag))+
-  geom_point(aes(TIMESTAMP,H.c),col='black')+
-  #scale_y_continuous(limits=c(-12,8))+
-  scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
-scale_color_manual(values = color_map, name = "QC H Flux")
+# --- Plot 2: overlay clean flux in black (NA removed) ---
+ggplot() +
+  geom_hline(yintercept = 0) +
+  geom_point(data = df[!is.na(df$H) & !is.na(df$H.flag), ],
+             aes(TIMESTAMP, H, color = H.flag)) +
+  geom_point(data = df[!is.na(df$H.c), ],
+             aes(TIMESTAMP, H.c), col = 'black') +
+  scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F")) +
+  scale_color_manual(values = color_map, name = "QC H Flux")
+
 
 
 ```
@@ -766,26 +834,32 @@ ggplot(data = df)+
 Add flag data
 ```{r}
 
-df$LE.flag <- ifelse(is.na(df$LE.c) & !is.na(co2fluxclean) & df$LE.flag != 2 & df$LE.flag != 3, 4, df$LE.flag)
-
-df$LE.flag <- as.factor(df$LE.flag)
+# --- Assign flag 4 for rolling/MAD cleaned points (NA-safe) ---
+df$LE.flag[df$LE.flag != 2 & df$LE.flag != 3 & is.na(df$LE.c) & !is.na(co2fluxclean)] <- 4
+df$LE.flag <- factor(df$LE.flag, levels = c(0,1,2,3,4))
 summary(df$LE.flag)
 
-color_map = c("0" = "yellow3", "1" = "darkblue" , "2" =  "red4", "3" = "pink3", "4" = "green4")
+# Color map
+color_map = c("0" = "yellow3", "1" = "darkblue", "2" = "red4", "3" = "pink3", "4" = "green4")
 
-ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,LE,color = LE.flag))+
-  #geom_point(aes(TIMESTAMP,LE.c),col='black')+
-  #scale_y_continuous(limits=c(-12,8))+
-  scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
-scale_color_manual(values = color_map, name = "QC LE Flux")
+# --- Plot 1: LE flux colored by flag (NA removed) ---
+ggplot(data = df[!is.na(df$LE) & !is.na(df$LE.flag), ]) +
+  geom_hline(yintercept = 0) +
+  geom_point(aes(TIMESTAMP, LE, color = LE.flag)) +
+  scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F")) +
+  scale_color_manual(values = color_map, name = "QC LE Flux")
 
-ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,LE,color = LE.flag))+
-  geom_point(aes(TIMESTAMP,LE.c),col='black')+
-  #scale_y_continuous(limits=c(-12,8))+
-  scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
-scale_color_manual(values = color_map, name = "QC LE Flux")
+# --- Plot 2: overlay clean flux in black (NA removed) ---
+ggplot() +
+  geom_hline(yintercept = 0) +
+  geom_point(data = df[!is.na(df$LE) & !is.na(df$LE.flag), ],
+             aes(TIMESTAMP, LE, color = LE.flag)) +
+  geom_point(data = df[!is.na(df$LE.c), ],
+             aes(TIMESTAMP, LE.c), col = 'black') +
+  scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F")) +
+  scale_color_manual(values = color_map, name = "QC LE Flux")
+
+
 ```
 # Main Plots
 

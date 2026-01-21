@@ -79,7 +79,7 @@ m <- as.numeric(format(seq(from = mindate,
                           by = 60*30),'%M'))
 H <- h+ifelse(m == 30,0.5,0)
 
-rpot <- potential.radiation(doy = JD,hour = H,latDeg = 74.7,longDeg = -94.9,timezone = -6,useSolartime = F)*1.1
+rpot <- potential.radiation(doy = JD,hour = H,latDeg = 68.53,longDeg = -149.55,timezone = -6,useSolartime = F)*1.1
 
 rpot <- as.data.frame(cbind(TIMESTAMP, rpot))
 
