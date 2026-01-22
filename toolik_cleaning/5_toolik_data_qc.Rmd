@@ -38,6 +38,7 @@ library(bigleaf) # for radiation check
 library(scales)
 library(lubridate)
 library(tidyr)
+library(openair)
 ```
 
 
@@ -390,7 +391,7 @@ ggplot(subset(df, !is.na(co2_flux.c) & !is.na(TA_2_1_1_1_1.c)),
   geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
   labs(x = "Time", y = expression(CO[2]~"Flux (µmol/m²/s)")) +
   theme_bw() +
-  scale_x_datetime(date_labels = "%b %d", date_breaks = "7 days")
+  scale_x_datetime(date_labels = "%b %d", date_breaks = "28 days")
 
 ggplot(subset(df, !is.na(ch4_flux.c) & !is.na(TA_2_1_1_1_1.c)),
        aes(x = TIMESTAMP, y = ch4_flux.c, color = TA_2_1_1_1_1.c)) +
@@ -399,7 +400,7 @@ ggplot(subset(df, !is.na(ch4_flux.c) & !is.na(TA_2_1_1_1_1.c)),
   geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
   labs(x = "Time", y = expression(CH[4]~"Flux (µmol/m²/s)")) +
   theme_bw() +
-  scale_x_datetime(date_labels = "%b %d", date_breaks = "7 days")
+  scale_x_datetime(date_labels = "%b %d", date_breaks = "28 days")
 
 ```
 ```{r, warning=FALSE}
@@ -431,7 +432,21 @@ ggplot(df_wind_hour, aes(x = hour, y = wind_dir, color = WS_16_33_1_1_1)) +
   theme_minimal()
 
 ```
+```{r,warning=FALSE}
+df_wind_openair <- df %>%
+  filter(!is.na(wind_dir) & !is.na(WS_16_33_1_1_1)) %>%
+  rename(
+    wd = wind_dir,
+    ws = WS_16_33_1_1_1
+  )
 
+windRose(df_wind_openair,
+         ws = "ws",
+         wd = "wd",
+         paddle = FALSE,
+         key = TRUE,
+         main = "Wind Rose")
+```
 
 ```{r, warning=FALSE}
 
@@ -443,14 +458,6 @@ df_wind <- df %>%
   mutate(wind_bin = cut(wind_dir, breaks = seq(0,360,22.5), include.lowest=TRUE, right=FALSE)) %>%
   group_by(wind_bin) %>%
   summarise(WS_mean = mean(WS_16_33_1_1_1, na.rm=TRUE))
-
-ggplot(df_wind, aes(x = wind_bin, y = WS_mean)) +
-  geom_col(fill="grey70", color="black", width=1) +
-  coord_polar() +
-  scale_x_discrete(labels = seq(0,337.5,22.5)) +
-  labs(title="Wind", x="", y="") +
-  theme_minimal() +
-  theme(axis.text.y = element_blank())
 
 # CO₂ data
 df_co2_wr <- df %>%
@@ -623,6 +630,7 @@ ggplot(df, aes(x = TIMESTAMP)) +
 
 
 ```
+
 ```{r, warning=FALSE}
 
 ggplot(df, aes(x = TIMESTAMP)) +
@@ -792,6 +800,7 @@ ggplot(subset(df, !is.na(ch4_flux.c) & !is.na(SHF_6_37_2_1_1_1.c)),
 
 
 ```
+
 ```{r, warning=FALSE}
 # SWIN
 ggplot(subset(df, !is.na(co2_flux.c) & !is.na(SWIN_6_10_1_1_1.c)),
@@ -961,7 +970,7 @@ diurnal_ch4
 
 ```
 
-
+#temps
 ```{r, warning=FALSE}
 
 ggplot(data = df) + 
@@ -985,6 +994,140 @@ ggplot(data = df) +
 
 
 ```
+
+
+```{r, warning=FALSE}
+df$EB <- df$H.c + df$LE.c
+
+
+
+df_long <- pivot_longer(
+  df,
+  cols = c(H.c, LE.c, EB),
+  names_to = "Flux",
+  values_to = "Value"
+)
+
+ggplot(df_long, aes(x = TIMESTAMP, y = Value, color = Flux)) +
+  geom_line() +
+  geom_hline(yintercept = 0, linetype="dashed") +
+  scale_color_manual(values = c("H.c"="red","LE.c"="green","EB"="blue")) +
+  labs(
+    x = "Time",
+    y = "Flux (W/m²)",
+    title = "H, LE, and (H+LE) Over Time"
+  ) +
+  theme_bw() +
+ scale_x_datetime(limits = as.POSIXct(c("2025-05-01", "2025-12-16")))
+
+df_plot <- subset(df, 
+                  !is.na(H.c) & 
+                  !is.na(LE.c) & 
+                  !is.na(SWC_12_36_1_1_1.c))
+
+ggplot(df_plot, aes(x = TIMESTAMP, color = SWC_12_36_1_1_1.c)) +
+  geom_line(aes(y = H.c), alpha = 0.9, linewidth = 0.6) +
+  geom_line(aes(y = LE.c), alpha = 0.9, linewidth = 0.6) +
+  scale_color_viridis_c(option = "plasma", name = "SWC") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  labs(
+    x = "Time",
+    y = "Flux (W/m²)",
+    title = "H & LE Flux vs Time (Colored by SWC)"
+  ) +
+  theme_bw() +
+  scale_x_datetime(limits = as.POSIXct(c("2025-07-01", "2025-12-16")))+ 
+  theme(legend.position = "right")
+
+```
+```{r, warning=FALSE}
+
+svp = 610.7*10^((7.5*df$TA_2_1_1_1_1.c)/(237.3+df$TA_2_1_1_1_1.c))
+df$vpd = ((100 - df$RH.c)/100)*svp
+```
+
+```{r, warning=FALSE}
+
+ggplot(
+  subset(df, !is.na(co2_flux.c) & !is.na(vpd)),
+  aes(x = vpd, y = co2_flux.c, color = vpd)
+) +
+  geom_point(alpha = 0.7, size = 1.5) +
+  scale_color_viridis_c(option = "plasma", name = "VPD") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  labs(
+    x = "VPD (kPa)",
+    y = expression(CO[2]~"Flux (µmol/m²/s)"),
+    title = "CO₂ Flux vs VPD"
+  ) +
+  theme_bw()
+
+ggplot(
+  subset(df, !is.na(ch4_flux.c) & !is.na(vpd)),
+  aes(x = vpd, y = ch4_flux.c, color = vpd)
+) +
+  geom_point(alpha = 0.7, size = 1.5) +
+  scale_color_viridis_c(option = "plasma", name = "VPD") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  labs(
+    x = "VPD (kPa)",
+    y = expression(CH[4]~"Flux (µmol/m²/s)"),
+    title = "CH₄ Flux vs VPD"
+  ) +
+  theme_bw()
+
+
+
+```
+
+
+```{r,warning=FALSE}
+ggplot(
+  subset(df, !is.na(LE.c) & !is.na(vpd)),
+  aes(x = vpd, y = LE.c, color = vpd)
+) +
+  geom_point(alpha = 0.7, size = 1.5) +
+  scale_color_viridis_c(option = "plasma", name = "VPD") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  labs(
+    x = "VPD (kPa)",
+    y = "LE (W/m²)",
+    title = "LE vs VPD"
+  ) +
+  theme_bw()
+
+
+
+```
+
+```{r, warning=FALSE}
+
+
+# CO2 vs RN
+p_co2 <- ggplot(subset(df, !is.na(RN_6_5_1_1_1.c) & !is.na(co2_flux.c)),
+                aes(x = RN_6_5_1_1_1.c, y = co2_flux.c, color = RN_6_5_1_1_1.c)) +
+  geom_point(alpha = 0.7, size = 1.2) +
+  scale_color_viridis_c(option = "magma", name = "Rn") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(x = "Net Radiation ", y = "CO₂ Flux (µmol/m²/s)",
+       title = "CO₂_flux vs Rn") +
+  theme_bw()
+
+# CH4 vs RN
+p_ch4 <- ggplot(subset(df, !is.na(RN_6_5_1_1_1.c) & !is.na(ch4_flux.c)),
+                aes(x = RN_6_5_1_1_1.c, y = ch4_flux.c, color = RN_6_5_1_1_1.c)) +
+  geom_point(alpha = 0.7, size = 1.2) +
+  scale_color_viridis_c(option = "magma", name = "Rn") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(x = "Net Radiation ", y = "CH₄ Flux (nmol/m²/s)",
+       title = "CH₄_flux vs Rn") +
+  theme_bw()
+
+p_co2
+p_ch4
+
+```
+# T air vs Sonic
 
 ```{r, warning=FALSE}
 
