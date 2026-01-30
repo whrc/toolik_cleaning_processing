@@ -1,0 +1,1425 @@
+---
+title: "Toolik annual qc check"
+author: "Kaj"
+date: "2026-01-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(error =  TRUE)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/') #use this to set your directory
+```
+
+
+This file generates plots for the annual data checks
+
+
+```{r, include=FALSE}
+# Load packages, cleaned data 
+
+rm(list = ls())
+
+library(data.table)
+library(ggplot2)
+library(cowplot)
+library(openair)
+library(plotrix)
+library(signal)
+library(svMisc)
+library(zoo)
+library(stringr)
+library(plyr)
+library(dplyr)
+library(patchwork) # formats plots
+library(bigleaf) # for radiation check
+library(scales)
+library(lubridate)
+library(tidyr)
+
+```
+
+#DATA LOADER AND FLAGS
+```{r, include = FALSE}
+
+df <- fread('./toolik_flux_c_met_c_202505_202512.csv')
+
+#df$ts <- df$ts-9*3600 #adjust timezone from UTC to CST
+#df$TIMESTAMP <- df$TIMESTAMP-9*3600 #adjust timezone from UTC to CST
+
+df$TIMESTAMP <- as.POSIXct( paste(df$TIMESTAMP, "00:00"), format = "%Y-%m-%d %H:%M", tz = "UTC")
+
+
+# data formatting for flag plots
+# Ensure flags are character first
+df$co2_flux.flag <- as.character(df$co2_flux.flag)
+df$ch4_flux.flag <- as.character(df$ch4_flux.flag)
+
+# Then assign factor with explicit levels
+df$co2_flux.flag <- factor(df$co2_flux.flag, levels = c("0","1","2","3","4","5"))
+df$ch4_flux.flag <- factor(df$ch4_flux.flag, levels = c("0","1","2","3","4","5"))
+
+#df$co2_flux.flag <- as.factor(df$co2_flux.flag)
+#df$ch4_flux.flag <- as.factor(df$ch4_flux.flag)
+
+color_map = c("0" = "yellow3", "1" = "darkblue" , "2" =  "red4", "3" = "orange", "4" = "green4", "5" = "purple")
+
+```
+
+
+# Timeseries Plots
+
+Flag = 0, 1, 2 : EP Flag
+Flag = 3 : Absolute Limits Filter
+Flag = 4 : Rolling MAD Filter
+Flag = 5 : Diagnostic filter
+
+# ANNUAL PLOT CO2
+```{r, warning=FALSE}
+# Flag = 0, 1, 2 : EP Flag
+# Flag = 3 : Absolute Limits Filter
+# Flag = 4 : Rolling MAD Filter
+# Flag = 5 : Diagnostic filter
+
+# -------------------------------
+# NEE Plot with Monthly Ticks
+# -------------------------------
+nee_plot_ytd <- ggplot(data = df) +
+  geom_hline(yintercept = 0) +
+  geom_point(
+    data = subset(df, !is.na(co2_flux.flag)),
+    aes(TIMESTAMP, co2_flux, color = co2_flux.flag)
+  ) +
+  geom_point(aes(TIMESTAMP, co2_flux.c), col = 'black') +
+  scale_y_continuous(limits = c(-30, 30)) +
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+  labs(
+    title = "Toolik",
+    x = "Month",
+    y = bquote(CO[2]~"Flux ("*mu*"mol m"^-2~"s"^-1*")")
+  ) +
+  scale_color_manual(values = color_map, name = "Cleaning Flag") +
+  theme_bw() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+nee_plot_ytd
+
+
+```
+# MONTHLY CO2
+
+```{r}
+
+# Add month column
+df <- df %>%
+  mutate(month = as.numeric(format(TIMESTAMP, "%m")))
+
+# Sort unique months
+months <- sort(unique(df$month))
+
+# Loop: print separate plot for each month
+for (m in months) {
+  
+  df_month <- df %>% filter(month == m)
+  
+  p <- ggplot(data = df_month) +
+    geom_hline(yintercept = 0) +
+    geom_point(
+      data = subset(df_month, !is.na(co2_flux.flag)),
+      aes(TIMESTAMP, co2_flux, color = co2_flux.flag),
+      alpha = 0.7
+    ) +
+    geom_point(
+      aes(TIMESTAMP, co2_flux.c),
+      color = 'black',
+      alpha = 0.7
+    ) +
+    scale_y_continuous(limits = c(-30, 30)) +
+    scale_color_manual(values = color_map, name = "Cleaning Flag") +
+    labs(
+     title = bquote(CO[2]~"Flux — Month"~~.(m)),
+      x = "Time",
+      y = expression(paste(CO[2], " Flux (µmol m"^-2," s"^-1,")"))
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+  
+  print(p)
+}
+```
+#BI WEEKLY CO2
+
+```{r, warning=FALSE}
+
+df <- df %>%
+  arrange(TIMESTAMP) %>%
+  mutate(
+    biweek = as.numeric(floor((as.numeric(TIMESTAMP) - min(as.numeric(TIMESTAMP))) / (14*24*3600))) + 1
+  )
+
+# Sort unique biweek periods
+biweeks <- sort(unique(df$biweek))
+
+# Loop: print separate plot for each bi-week window
+for (b in biweeks) {
+  
+  df_bw <- df %>% filter(biweek == b)
+  
+  p <- ggplot(data = df_bw) +
+    geom_hline(yintercept = 0) +
+    
+    geom_point(
+      data = subset(df_bw, !is.na(co2_flux.flag)),
+      aes(TIMESTAMP, co2_flux, color = co2_flux.flag),
+      alpha = 0.7
+    ) +
+    
+    geom_point(
+      aes(TIMESTAMP, co2_flux.c),
+      color = 'black',
+      alpha = 0.7
+    ) +
+    
+    scale_y_continuous(limits = c(-18, 18)) +
+    scale_x_datetime(
+      date_breaks = "1 day",
+      date_labels = "%d-%b"
+    ) +
+    scale_color_manual(values = color_map, name = "Cleaning Flag") +
+    
+    labs(
+      title = bquote(CO[2]~"Flux — Bi-Week"~~.(b)),
+      x = "Day",
+      y = expression(paste(CO[2], " Flux (µmol m"^-2," s"^-1,")"))
+    ) +
+    
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+  
+  print(p)
+}
+
+
+```
+
+
+#### ANNUAL CH4
+```{r, warning=FALSE, echo=FALSE}
+
+# Flag = 0, 1, 2 : EP Flag
+# Flag = 3 : Absolute Limits Filter
+# Flag = 4 : Rolling MAD Filter
+# Flag = 5 : Diagnostic filter
+
+ch4_plot_ytd <- ggplot(data = df) +
+  geom_hline(yintercept = 0) +
+  
+  # QC flagged points
+  geom_point(
+    data = subset(df, !is.na(ch4_flux.flag)),
+    aes(TIMESTAMP, ch4_flux, color = ch4_flux.flag),
+    alpha = 0.7
+  ) +
+  
+  # Corrected CH4 points
+  geom_point(aes(TIMESTAMP, ch4_flux.c), col = 'black', alpha = 0.7) +
+  
+  # Y-axis limits
+  scale_y_continuous(limits = c(-0.1, 0.33)) +
+  
+  # X-axis monthly ticks
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+  
+  # QC color mapping
+  scale_color_manual(values = color_map, name = "QC CH4 Flux") +
+  
+  # Labels
+  labs(
+    title = "Toolik",
+    x = "Month",
+    y = bquote(CH[4]~"Flux ("*mu*"mol m"^-2~"s"^-1*")")
+  ) +
+  
+  theme_bw() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "right"
+  )
+
+ch4_plot_ytd
+
+
+```
+
+#CH4 MONTHLY
+
+```{r, warning=FALSE}
+
+# Add month column if not already present
+if(!"month" %in% names(df)) {
+  df <- df %>% mutate(month = as.numeric(format(TIMESTAMP, "%m")))
+}
+
+# List unique months
+months <- sort(unique(df$month))
+
+for (m in months) {
+  
+  df_month <- df %>% filter(month == m)
+  
+  p <- ggplot(data = df_month) +
+    geom_hline(yintercept = 0) +
+    geom_point(
+      data = subset(df_month, !is.na(ch4_flux.flag)),
+      aes(TIMESTAMP, ch4_flux, color = ch4_flux.flag),
+      alpha = 0.7
+    ) +
+    geom_point(
+      aes(TIMESTAMP, ch4_flux.c),
+      color = "black",
+      alpha = 0.7
+    ) +
+   # scale_y_continuous(limits = c(-0.1, 0.1)) +
+    scale_color_manual(values = color_map, name = "QC CH4 Flux") +
+    labs(
+      title = bquote(CH[4]~"Flux — Month"~~.(m)),
+      x = "Time",
+      y = expression(paste(CH[4], " Flux (µmol m"^-2," s"^-1,")"))
+    ) +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+  
+  print(p)
+}
+
+
+```
+
+#BI WEEKLY CH4
+```{r, warning=FALSE}
+
+df <- df %>%
+  arrange(TIMESTAMP) %>%
+  mutate(
+    biweek = as.numeric(floor((as.numeric(TIMESTAMP) - min(as.numeric(TIMESTAMP))) / (14*24*3600))) + 1
+  )
+
+# Sort unique biweek periods
+biweeks <- sort(unique(df$biweek))
+
+# Loop: print separate plot for each bi-week window
+for (b in biweeks) {
+  
+  df_bw <- df %>% filter(biweek == b)
+  
+  p <- ggplot(data = df_bw) +
+    geom_hline(yintercept = 0) +
+    
+    geom_point(
+      data = subset(df_bw, !is.na(ch4_flux.flag)),
+      aes(TIMESTAMP, ch4_flux, color = ch4_flux.flag),
+      alpha = 0.7
+    ) +
+    
+    geom_point(
+      aes(TIMESTAMP, ch4_flux.c),
+      color = "black",
+      alpha = 0.7
+    ) +
+    
+    # Daily x-axis ticks
+    scale_x_datetime(
+      date_breaks = "1 day",
+      date_labels = "%d-%b"
+    ) +
+    
+    scale_color_manual(values = color_map, name = "QC CH₄ Flux") +
+    
+    labs(
+      title = bquote(CH[4]~"Flux — Bi-Week"~~.(b)),
+      x = "Time",
+      y = expression( paste(CH[4], " Flux (µmol m"^-2," s"^-1,")"))
+    ) +
+    
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+  
+  print(p)
+}
+
+
+```
+
+
+# ANNUAL EB 
+```{r, warning=FALSE}
+
+
+```
+
+```{r}
+
+# -------------------------------
+# Compute net radiation safely
+# -------------------------------
+df$Rn <- df$LWIN_6_14_1_1_1.c + df$SWIN_6_10_1_1_1.c -
+         df$LWOUT_6_15_1_1_1.c - df$SWOUT_6_11_1_1_1.c
+
+# -------------------------------
+# Compute SHF safely with fallback
+# -------------------------------
+# Vectorized row-wise handling
+df$shf_avg = rowMeans(
+  df[, c("SHF_6_37_1_1_1.c", "SHF_6_37_2_1_1.c")],
+  na.rm = TRUE
+)
+
+# Replace rows where both SHF were missing
+both_missing <- is.na(df$SHF_6_37_1_1_1.c) & is.na(df$SHF_6_37_2_1_1.c)
+df$shf_avg[both_missing] = 0  # or df$Rn[both_missing] if you want met = 0 when missing
+
+# -------------------------------
+# Compute energy balance
+# -------------------------------
+df$met <- df$Rn - df$shf_avg
+df$flux <- df$H.c + df$LE.c
+
+# -------------------------------
+# Fit linear model
+# -------------------------------
+mod <- lm(flux ~ met, data = df)
+summary_mod <- summary(mod)
+
+slope <- coef(mod)["met"]
+r2 <- summary_mod$r.squared
+
+cat("Slope:", round(slope,3), "\nR²:", round(r2,3), "\n")
+
+# -------------------------------
+# Plot
+# -------------------------------
+x_lim <- c(-200, 500)
+y_lim <- c(-200, 500)
+
+eb_ytd <- ggplot(df, aes(x = met, y = flux)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", color = "blue", se = FALSE) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  geom_hline(yintercept = 0, linetype = "solid", color = "black") +
+  geom_vline(xintercept = 0, linetype = "solid", color = "black") +
+  coord_fixed(ratio = 1, xlim = x_lim, ylim = y_lim) +
+  labs(
+    x = expression("Rn - G  (W m"^-2*")"),
+    y = expression("H + LE  (W m"^-2*")"),
+    title = "Toolik Full Year Energy Balance"
+  ) +
+  annotate(
+    "text",
+    x = max(x_lim), y = min(y_lim),
+    label = paste0("Slope = ", round(slope, 3), "\nR² = ", round(r2, 3)),
+    hjust = 1.1, vjust = -0.5, size = 4
+  ) +
+  theme_bw()
+
+# Print plot
+eb_ytd
+
+
+```
+# MONTHLY EB
+
+```{r, warning=FALSE}
+
+# Add month column if not already present
+if(!"month" %in% names(df)) {
+  df <- df %>% mutate(month = as.numeric(format(TIMESTAMP, "%m")))
+}
+
+# Filter out NAs
+df_plot <- df %>% filter(!is.na(month) & !is.na(flux) & !is.na(met))
+
+# Fit linear model for full year
+mod <- lm(flux ~ met, data = df_plot)
+summary_mod <- summary(mod)
+slope <- coef(mod)["met"]
+r2 <- summary_mod$r.squared
+
+cat("Slope:", slope, "\nR²:", r2, "\n")
+
+# Axis limits
+x_lim <- c(-200, 500)
+y_lim <- c(-200, 500)
+
+# Plot with month coloring
+eb_ytd_month <- ggplot(df_plot, aes(x = met, y = flux, color = factor(month))) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", color = "blue", se = FALSE) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  geom_hline(yintercept = 0, linetype = "solid", color = "black") +
+  geom_vline(xintercept = 0, linetype = "solid", color = "black") +
+  coord_fixed(ratio = 1, xlim = x_lim, ylim = y_lim) +
+  scale_color_viridis_d(name = "Month") +
+  labs(
+    x = expression("Rn - G  (W m"^-2*")"),
+    y = expression("H + LE  (W m"^-2*")"),
+    title = "Toolik Full Year Energy Balance"
+  ) +
+  annotate(
+    "text",
+    x = max(x_lim), y = min(y_lim),
+    label = paste0("Slope = ", round(slope, 3), "\nR² = ", round(r2, 3)),
+    hjust = 1.1, vjust = -0.5, size = 4
+  ) +
+  theme_bw()
+
+# Print
+eb_ytd_month
+
+
+```
+# ANNUAL ENERGY FLUX (ATMOSPHERIC)
+
+```{r, warning=FALSE}
+
+# -------------------------------
+# Full-year H & LE plot with smoothing
+# -------------------------------
+p_flux_full <- ggplot(df) +
+  theme_bw() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+
+  # Raw lines (slightly transparent)
+geom_line(aes(x = TIMESTAMP, y = H.c, color = "H"), linewidth = 0.8, alpha = 0.5) +
+geom_line(aes(x = TIMESTAMP, y = LE.c, color = "LE"), linewidth = 0.8, alpha = 0.5) +
+
+# Smoothed lines (fully opaque)
+geom_smooth(aes(x = TIMESTAMP, y = H.c, color = "H"), method = "loess",
+            span = 0.02, linewidth = 1, se = FALSE, alpha = 1) +
+geom_smooth(aes(x = TIMESTAMP, y = LE.c, color = "LE"), method = "loess",
+            span = 0.02, linewidth = 1, se = FALSE, alpha = 1)+
+
+
+  # Colors
+  scale_color_manual(
+    name = "Flux",
+    values = c("H" = "firebrick", "LE" = "dodgerblue3")
+  ) +
+
+  # X-axis formatting
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+
+  # Labels
+  labs(
+    x = "Month",
+    y = expression(Flux~"(W/m"^2*")"),
+    title = "H & LE — Full Year"
+  ) +
+
+  # Theme
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+# Print
+p_flux_full
+
+
+```
+
+# ANNUAL LONGWAVE IN/OUT
+
+```{r, warning=FALSE}
+# -------------------------------
+# Longwave Radiation Plot with Smoothing
+# -------------------------------
+df_lw <- df %>%
+  select(TIMESTAMP, LWIN_6_14_1_1_1.c, LWOUT_6_15_1_1_1.c) %>%
+  pivot_longer(
+    cols = c(LWIN_6_14_1_1_1.c, LWOUT_6_15_1_1_1.c),
+    names_to = "variable",
+    values_to = "value"
+  )
+
+p_lw <- ggplot(df_lw, aes(x = TIMESTAMP, y = value, color = variable)) +
+  geom_line(linewidth = 0.8, alpha = 0.6) +           # raw data
+  geom_smooth(
+    method = "loess",
+    span = 0.02,                                      # small span for sensitive smoothing
+    linewidth = 1,
+    se = FALSE
+  ) +
+  scale_color_manual(
+    values = c("LWIN_6_14_1_1_1.c" = "firebrick", "LWOUT_6_15_1_1_1.c" = "dodgerblue"),
+    labels = c("Incoming LW", "Outgoing LW"),
+    name = NULL
+  ) +
+ scale_y_continuous(
+  name = expression(Longwave~Radiation~"(W/m"^2*")"),
+  breaks = scales::pretty_breaks(n = 8)
+  ) +
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+  labs(
+    x = "Month",
+    title = "Longwave Radiation In/Out"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+p_lw
+
+
+
+```
+#ANNUAL SHORTWAVE IN/OUT
+
+```{r, warning=FALSE}
+# -------------------------------
+# Shortwave Radiation Plot with Smoothing
+# -------------------------------
+df_sw <- df %>%
+  select(TIMESTAMP, SWIN_6_10_1_1_1.c, SWOUT_6_11_1_1_1.c) %>%
+  pivot_longer(
+    cols = c(SWIN_6_10_1_1_1.c, SWOUT_6_11_1_1_1.c),
+    names_to = "variable",
+    values_to = "value"
+  )
+
+p_sw <- ggplot(df_sw, aes(x = TIMESTAMP, y = value, color = variable)) +
+  geom_line(linewidth = 0.8, alpha = 0.6) +           # raw data
+  geom_smooth(
+    method = "loess",
+    span = 0.02,                                      # sensitive smoothing
+    linewidth = 1,
+    se = FALSE
+  ) +
+  scale_color_manual(
+    values = c("SWIN_6_10_1_1_1.c" = "pink4", "SWOUT_6_11_1_1_1.c" = "dodgerblue4"),
+    labels = c("Incoming SW", "Outgoing SW"),
+    name = NULL
+  ) +
+  scale_y_continuous(
+    name = expression(Shortwave~Radiation~"(W/m"^2*")"),
+    breaks = scales::pretty_breaks(n = 8)
+  ) +
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+  labs(
+    x = "Month",
+    title = "Shortwave Radiation In/Out"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+p_sw
+
+
+```
+# ANNUAL PAR
+
+```{r, warning=FALSE}
+
+# -------------------------------
+# 1. Prepare cleaned PAR data
+# -------------------------------
+df_par_IN  <- df %>% filter(!is.na(PPFD_7_21_1_1_1.c))
+df_par_OUT <- df %>% filter(!is.na(PPFDR_7_23_1_1_1.c))
+
+# -------------------------------
+# 2. Annual PAR plots with monthly ticks
+# -------------------------------
+
+# Incoming PAR
+p_par_IN <- ggplot(df_par_IN, aes(x = TIMESTAMP, y = PPFD_7_21_1_1_1.c)) +
+  geom_line(alpha = 0.6, color = "forestgreen") +
+  geom_smooth(method = "loess", span = 0.01, color = "black", linewidth = 0.7, se = FALSE) +
+  scale_y_continuous(
+    name = expression(PAR~"(µmol m"^-2~" s"^-1*")"),
+    expand = expansion(mult = 0.05)
+  ) +
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+  labs(
+    x = "",
+    title = "Annual PAR — In"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.y = element_text(color = "black"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+# Outgoing PAR
+p_par_OUT <- ggplot(df_par_OUT, aes(x = TIMESTAMP, y = PPFDR_7_23_1_1_1.c)) +
+  geom_line(alpha = 0.6, color = "forestgreen") +
+  geom_smooth(method = "loess", span = 0.01, color = "black", linewidth = 0.7, se = FALSE) +
+  scale_y_continuous(
+    name = expression(PAR~"(µmol m"^-2~" s"^-1*")"),
+    expand = expansion(mult = 0.05)
+  ) +
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+  labs(
+    x = "",
+    title = "Annual PAR — Out"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.y = element_text(color = "black"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+# -------------------------------
+# 3. Display stacked plots
+# -------------------------------
+p_par_IN / p_par_OUT
+
+
+
+```
+
+# ANNUAL GROUND HEAT FLUX 
+
+```{r, warning=FALSE}
+
+df$G = (df$SHF_6_37_1_1_1.c + df$SHF_6_37_2_1_1.c)/2
+
+
+# -------------------------------
+# 4. Plot G (Soil Heat Flux)
+# -------------------------------
+p2 <- ggplot(df, aes(x = TIMESTAMP)) +
+  geom_line(aes(y = G, color = "Soil Heat Flux"), linewidth = 0.7) +
+  scale_y_continuous(
+    name = expression(Soil~Heat~Flux~(W/m^2)),
+    breaks = scales::pretty_breaks(n = 8),
+    expand = expansion(mult = 0.05)
+  ) +
+  scale_color_manual(
+    values = c("Soil Heat Flux" = "blue"),
+    labels = c("Soil Heat Flux"),
+    name = NULL
+  ) +
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+  labs(
+    x = "",
+    title = "Soil Heat Flux — Full Year"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.y = element_text(color = "blue"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top"
+  )
+
+p2 
+
+```
+
+#ANNUAL AIR T VS SOIL T
+
+```{r, warning=FALSE}
+
+# -------------------------------
+# Soil Temperature Plot
+# -------------------------------
+p_soil <- ggplot(data = df) +
+  theme_bw() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_line(aes(x = TIMESTAMP, y = TS_2_38_1_1_1.c, color = "8 cm"), linewidth = 0.8) +
+  geom_line(aes(x = TIMESTAMP, y = TS_2_38_2_1_1.c, color = "18 cm"), linewidth = 0.8) +
+  geom_line(aes(x = TIMESTAMP, y = TS_2_38_23_1_1.c, color = "28 cm"), linewidth = 0.8) +
+  scale_color_manual(
+    values = c("8 cm" = "blue", "18 cm" = "green", "28 cm" = "gold3"),
+    breaks = c("8 cm", "18 cm", "28 cm"),  # enforce order in legend
+    name = NULL
+  ) +
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+  labs(
+    x = "",
+    y = expression("Temperature ("*degree*C*")"),
+    title = "Soil Temperatures"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top"
+  )
+
+# -------------------------------
+# Air Temperature Plot
+# -------------------------------
+p_air <- ggplot(data = df) +
+  theme_bw() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_line(aes(x = TIMESTAMP, y = TA_2_1_1_1_1.c), color = "red", linewidth = 0.8) +
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+  labs(
+    x = "",
+    y = expression("Temperature ("*degree*C*")"),
+    title = "Air Temperature"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+# -------------------------------
+# Stack plots
+# -------------------------------
+p_soil / p_air
+
+
+
+```
+
+#MONTHLY AIR T VS SOIL T
+
+```{r, warning=FALSE}
+
+
+plot_monthly_soil_air <- function(df, tz = "UTC") {
+
+  months <- sort(unique(df$month))
+
+  for (m in months) {
+
+    df_month <- df %>% filter(month == m)
+    if (nrow(df_month) == 0) next
+
+    # -------------------------------
+    # Soil Temperature Plot
+    # -------------------------------
+    p_soil <- ggplot(df_month) +
+      theme_bw() +
+      geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+
+      geom_line(
+        aes(x = TIMESTAMP, y = TS_2_38_1_1_1.c, color = "8 cm"),
+        linewidth = 0.8,
+        na.rm = FALSE
+      ) +
+      geom_line(
+        aes(x = TIMESTAMP, y = TS_2_38_2_1_1.c, color = "18 cm"),
+        linewidth = 0.8,
+        na.rm = FALSE
+      ) +
+      geom_line(
+        aes(x = TIMESTAMP, y = TS_2_38_23_1_1.c, color = "28 cm"),
+        linewidth = 0.8,
+        na.rm = FALSE
+      ) +
+
+      scale_color_manual(
+        values = c("8 cm" = "blue", "18 cm" = "green", "28 cm" = "gold3"),
+        breaks = c("8 cm", "18 cm", "28 cm"),
+        name = NULL
+      ) +
+
+      labs(
+        x = "",
+        y = expression("Temperature ("*degree*C*")"),
+        title = paste0("Soil Temperatures — Month ", m)
+      ) +
+      theme(legend.position = "top")
+
+    # -------------------------------
+    # Air Temperature Plot
+    # -------------------------------
+    p_air <- ggplot(df_month) +
+      theme_bw() +
+      geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+
+      geom_line(
+        aes(x = TIMESTAMP, y = TA_2_1_1_1_1.c),
+        color = "red",
+        linewidth = 0.8,
+        na.rm = FALSE
+      ) +
+
+      labs(
+        x = "",
+        y = expression("Temperature ("*degree*C*")"),
+        title = paste0("Air Temperature — Month ", m)
+      )
+
+    # -------------------------------
+    # Stack and print
+    # -------------------------------
+    print(p_soil / p_air)
+  }
+}
+
+plot_monthly_soil_air(df)
+
+
+```
+# BI WEEKLY AIR T VS SOIL T
+
+```{r, warning=FALSE}
+
+# -------------------------------
+# Loop over biweeks
+# -------------------------------
+for (b in biweeks) {
+
+  df_bw <- df %>% filter(biweek == b)
+
+  # Skip empty biweeks
+  if (nrow(df_bw) == 0) next
+
+  # -------------------------------
+  # Soil Temperature Plot
+  # -------------------------------
+  p_soil <- ggplot(df_bw) +
+    theme_bw() +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+
+    geom_line(
+      aes(x = TIMESTAMP, y = TS_2_38_1_1_1.c, color = "8 cm"),
+      linewidth = 0.8,
+      na.rm = FALSE
+    ) +
+    geom_line(
+      aes(x = TIMESTAMP, y = TS_2_38_2_1_1.c, color = "18 cm"),
+      linewidth = 0.8,
+      na.rm = FALSE
+    ) +
+    geom_line(
+      aes(x = TIMESTAMP, y = TS_2_38_23_1_1.c, color = "28 cm"),
+      linewidth = 0.8,
+      na.rm = FALSE
+    ) +
+
+    scale_color_manual(
+      values = c("8 cm" = "blue", "18 cm" = "green", "28 cm" = "gold3"),
+      breaks = c("8 cm", "18 cm", "28 cm"),
+      name = NULL
+    ) +
+
+    scale_x_datetime(
+      date_breaks = "1 day",
+      date_labels = "%d-%b"
+    ) +
+
+    labs(
+      x = "",
+      y = expression("Temperature ("*degree*C*")"),
+      title = paste0("Soil Temperatures — Bi-Week ", b)
+    ) +
+
+    theme(
+      legend.position = "top",
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+
+  # -------------------------------
+  # Air Temperature Plot
+  # -------------------------------
+  p_air <- ggplot(df_bw) +
+    theme_bw() +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+
+    geom_line(
+      aes(x = TIMESTAMP, y = TA_2_1_1_1_1.c),
+      color = "red",
+      linewidth = 0.8,
+      na.rm = FALSE
+    ) +
+
+    scale_x_datetime(
+      date_breaks = "1 day",
+      date_labels = "%d-%b"
+    ) +
+
+    labs(
+      x = "",
+      y = expression("Temperature ("*degree*C*")"),
+      title = paste0("Air Temperature — Bi-Week ", b)
+    ) +
+
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+
+  # -------------------------------
+  # Stack and print
+  # -------------------------------
+  print(p_soil / p_air)
+}
+
+
+```
+#SOIL WATER CONTENT
+
+```{r, warning=FALSE}
+
+p_swc <- ggplot(df) +
+  geom_line(aes(TIMESTAMP, SWC_12_36_1_1_1.c * 100, 
+                color = "8 cm", linetype = "8 cm"), linewidth = 0.8) +
+  geom_line(aes(TIMESTAMP, SWC_12_36_2_1_1.c * 100, 
+                color = "18 cm", linetype = "18 cm"), linewidth = 0.8) +
+  geom_line(aes(TIMESTAMP, SWC_12_36_3_1_1.c * 100, 
+                color = "28 cm", linetype = "28 cm"), linewidth = 0.8) +
+  scale_y_continuous(
+    name = "% VWC", 
+    breaks = scales::pretty_breaks(n = 8)   # dynamic axis
+  ) +
+  scale_color_manual(
+    values = c("8 cm" = "darkblue", "18 cm" = "steelblue", "28 cm" = "skyblue"),
+    breaks = c("8 cm","18 cm","28 cm"),
+    name = NULL  # removes legend title
+  ) +
+  scale_linetype_manual(
+    values = c("8 cm" = "solid", "18 cm" = "solid", "28 cm" = "solid"),
+    breaks = c("8 cm","18 cm","28 cm"),
+    name = NULL  # removes legend title
+  ) +
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"  # shows Jan, Feb, Mar, etc.
+  ) +
+  labs(
+    x = "",
+    title = "Soil Water Content"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+p_swc
+
+
+```
+
+
+# ANNUAL RELATIVE HUMIDITY
+
+```{r, warning=FALSE}
+
+# -------------------------------
+# Relative Humidity Plot with Smoothing
+# -------------------------------
+p_rh <- ggplot(df, aes(x = TIMESTAMP, y = RH.c)) +
+  geom_line(alpha = 0.5, color = "steelblue", linewidth = 0.7) +  # raw line
+  geom_smooth(
+    method = "loess", 
+    span = 0.05,         # smaller span = more sensitive smoothing
+    color = "blue", 
+    linewidth = 1, 
+    se = FALSE
+  ) +
+  scale_y_continuous(
+    name = "Relative Humidity (%)",
+    limits = c(0, 100),
+    breaks = seq(0, 100, 10)
+  ) +
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+  labs(
+    x = "",
+    title = "Relative Humidity"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+p_rh
+
+
+```
+
+
+# ANNUAL BAROMETRIC PRESSURE (uncleaned from sonic)
+
+
+```{r, warning=FALSE}
+
+# -------------------------------
+# Air Pressure (Pa -> kPa) plot
+# -------------------------------
+df_pres <- df %>%
+  filter(!is.na(air_pressure)) %>%
+  mutate(air_pressure_kpa = air_pressure / 1000)
+
+p_pres <- ggplot(df_pres, aes(x = TIMESTAMP, y = air_pressure_kpa)) +
+  geom_line(color = "gray40", alpha = 0.6, linewidth = 0.6) +   # raw data
+  geom_smooth(
+    method = "loess",
+    span = 0.05,
+    se = FALSE,
+    color = "black",
+    linewidth = 1
+  ) +
+  scale_y_continuous(
+    name = "Air Pressure (kPa)",
+    breaks = scales::pretty_breaks(n = 8)
+  ) +
+   scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+  labs(
+    x = "",
+    title = "Air Pressure"
+  ) +
+  theme_minimal()
+
+p_pres
+
+
+```
+
+
+# ANNUAL AIR TEMP CHECK (HMP VS SONIC)
+
+```{r, warning=FALSE}
+
+# Annual Temperature Plot with Monthly Ticks (no superscripts)
+p_annual <- ggplot(df, aes(x = TIMESTAMP)) +
+  geom_line(aes(y = TA_2_1_1_1_1.c, color = "Air Temp"), linewidth = 0.8) +
+  geom_line(aes(y = sonic_temperature - 273.15, color = "Sonic Temp"), linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Air Temp" = "red", "Sonic Temp" = "blue")) +
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+  labs(
+    x = "",
+    y = expression("Temperature ("*degree*C*")"),
+    color = "Sensor",
+    title = "Annual Temperature Comparison"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+print(p_annual)
+
+```
+
+# MONTHLY AIR TEMP CHECK (HMP VS SONIC)
+
+```{r, warning=FALSE}
+# Ensure month column exists
+if(!"month" %in% names(df)) {
+  df <- df %>% mutate(month = as.numeric(format(TIMESTAMP, "%m")))
+}
+
+# List unique months
+months <- sort(unique(df$month))
+
+# Loop: print separate plot for each month
+for (m in months) {
+  
+  df_month <- df %>% filter(month == m)
+  
+  # Skip empty months
+  if (nrow(df_month) == 0) next
+  
+  p_month <- ggplot(df_month, aes(x = TIMESTAMP)) +
+    geom_line(aes(y = TA_2_1_1_1_1.c, color = "Air Temp"), linewidth = 0.8) +
+    geom_line(aes(y = sonic_temperature - 273.15, color = "Sonic Temp"), linewidth = 0.8) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+    scale_color_manual(values = c("Air Temp" = "red", "Sonic Temp" = "blue")) +
+    labs(
+      x = "",
+      y = expression("Temperature ("*degree*C*")"),
+      color = "Sensor",
+      title = paste0("Temperature Comparison — Month ", m)
+    ) +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  print(p_month)
+}
+
+```
+
+# BI WEEKLY AIR TEMP CHECK (HMP VS SONIC)
+
+```{r, warning=FALSE}
+
+df <- df %>%
+  arrange(TIMESTAMP) %>%
+  mutate(biweek = as.numeric(floor((as.numeric(TIMESTAMP) - min(as.numeric(TIMESTAMP))) / (14*24*3600))) + 1)
+
+biweeks <- sort(unique(df$biweek))
+plots <- list()
+
+for (b in biweeks) {
+  df_bw <- df %>% filter(biweek == b)
+  
+  p <- ggplot(df_bw, aes(x = TIMESTAMP)) +
+    geom_line(aes(y = TA_2_1_1_1_1.c, color = "Air Temp"), linewidth = 0.8) +
+    geom_line(aes(y = sonic_temperature - 273.15, color = "Sonic Temp"), linewidth = 0.8) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+    scale_color_manual(values = c("Air Temp" = "red", "Sonic Temp" = "blue")) +
+    labs(
+      x = "",
+      y = expression("Temperature ("*degree*C*")"),
+      color = "Sensor",
+      title = paste(" Bi-Weekly Period:", b)
+    ) +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+  plots[[paste0("temp_biweek_", b)]] <- p
+}
+
+# print all biweek plots
+for (name in names(plots)) {
+  print(plots[[name]])
+}
+
+
+```
+# ANNUAL ALBEDO
+
+```{r, warning=FALSE}
+
+
+# -------------------------------
+# 1. Filter cleaned Albedo data
+# -------------------------------
+df_alb_clean <- df %>% 
+  filter(!is.na(ALB_1_1_1.c))  # remove NAs
+
+# -------------------------------
+# 2. Annual Albedo plot
+# -------------------------------
+p_albedo <- ggplot(df_alb_clean, aes(x = TIMESTAMP, y = ALB_1_1_1.c)) +
+  geom_line(alpha = 0.6, color = "darkgreen") +  # raw line
+  geom_smooth(method = "loess", span = 0.05, color = "black", linewidth = 1.0, se = FALSE) +
+  scale_y_continuous(
+    name = "Albedo",
+    limits = c(0, 1),
+    expand = expansion(mult = 0.05)
+  ) +
+   scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+  labs(
+    x = "",
+    title = "Annual Albedo"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.y = element_text(color = "darkgreen")
+  )
+
+p_albedo
+
+
+```
+# ANNUAL SNOW DEPTH
+
+```{r, warning=FALSE}
+# -------------------------------
+# Prepare snow depth
+# -------------------------------
+df_sd <- df %>%
+  filter(!is.na(SD_10_99_1_1_1)) %>%
+  mutate(
+    SD_cm = (SD_10_99_1_1_1 - (-2.06)) * 10  # adjust and convert to cm
+  )
+
+# -------------------------------
+# Annual plot of snow depth
+# -------------------------------
+p_sd_annual <- ggplot(df_sd, aes(x = TIMESTAMP, y = SD_cm)) +
+  geom_point(alpha = 0.4, color = "gray") +  # raw data
+  geom_smooth(method = "loess", span = 0.051, color = "darkblue", se = FALSE) +  # smooth trend
+  scale_y_continuous(name = "Snow Depth (cm)") +
+  labs(
+    x = "",
+    title = "Snow Depth — Annual"
+  ) +
+   scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.y = element_text(color = "black")
+  )
+
+p_sd_annual
+
+
+```
+
+
+```{r, warning=FALSE}
+
+
+```
+
+# ANNUAL WIND
+
+```{r, warning=FALSE}
+df_wind_openair <- df %>%
+  filter(!is.na(wind_dir) & !is.na(WS_16_33_1_1_1)) %>%
+  rename(
+    wd = wind_dir,
+    ws = WS_16_33_1_1_1
+  )
+
+windRose(df_wind_openair,
+         ws = "ws",
+         wd = "wd",
+         paddle = FALSE,
+         key = TRUE,
+         main = "Toolik")
+
+```
+
+#MONTHLY WIND
+```{r, warning=FALSE}
+
+# Prepare wind data
+df_wind_openair <- df %>%
+  filter(!is.na(wind_dir) & !is.na(WS_16_33_1_1_1)) %>%
+  rename(
+    wd = wind_dir,
+    ws = WS_16_33_1_1_1
+  ) %>%
+  mutate(month = as.numeric(format(TIMESTAMP, "%m")))
+
+# Unique months
+months <- sort(unique(df_wind_openair$month))
+
+# Loop over months and print wind roses
+for (m in months) {
+  df_month <- df_wind_openair %>% filter(month == m)
+  
+  windRose(df_month,
+           ws = "ws",
+           wd = "wd",
+           paddle = FALSE,
+           key = TRUE,
+           main = paste(" Month", m))
+}
+
+```
+
+#POTENTIAL RADIATION VS SWIN - TIME ALIGNMENT CHECK
+
+```{r, warning=FALSE}
+generate_two_week_plots_rad <- function(df, timestamp_col, value_col) {
+  
+  library(ggplot2)
+  library(dplyr)
+  
+  # Ensure timestamp is POSIXct
+  df[[timestamp_col]] <- as.POSIXct(df[[timestamp_col]], tz = "UTC")
+  
+  # Ensure radflag exists and is a factor
+  if(!"radflag" %in% names(df)) stop("Column 'radflag' not found")
+  df$radflag <- factor(df$radflag, levels = c(0, 1))
+  
+  # Determine overall date range
+  start_datetime <- min(df[[timestamp_col]], na.rm = TRUE)
+  end_datetime <- max(df[[timestamp_col]], na.rm = TRUE)
+  interval_seconds <- 14 * 24 * 3600
+  
+  current_start <- start_datetime
+  plot_count <- 1
+  
+  # Base plot
+  base_plot <- ggplot(df, aes(x = .data[[timestamp_col]], y = .data[[value_col]])) +
+    geom_point(aes(color = radflag)) +
+    geom_line(aes(y = rpot), color = "blue") +
+    labs(x = "", y = value_col, color = "Rad Flag") +   # clean legend title
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = "top") +
+    scale_color_manual(
+      values = c("0" = "black", "1" = "red"),
+      drop = FALSE   # keeps both levels in the legend
+    )
+  
+  # Loop through 14-day intervals
+  while(current_start < end_datetime) {
+    
+    current_end <- min(current_start + interval_seconds, end_datetime)
+    
+    plot_title <- paste0(
+      "Data from ", format(current_start, "%Y-%m-%d"),
+      " to ", format(current_end, "%Y-%m-%d")
+    )
+    
+    p <- base_plot +
+      ggtitle(plot_title) +
+      scale_x_datetime(
+        limits = c(current_start, current_end),
+        date_breaks = "2 day",
+        date_labels = "%b %d"
+      )
+    
+    print(p)  # automatic plotting
+    
+    assign(paste0("rad_plot_", plot_count), p, envir = .GlobalEnv)
+    
+    current_start <- current_start + interval_seconds
+    plot_count <- plot_count + 1
+  }
+  
+
+}
+
+
+generate_two_week_plots_rad(df, "TIMESTAMP","SWIN_6_10_1_1_1")
+
+```
+

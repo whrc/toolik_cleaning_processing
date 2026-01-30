@@ -63,6 +63,8 @@ Load in eddypro output files
 
 ```{r, warning=FALSE}
 df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202505_202512.csv')
+
+df[, TIMESTAMP := as.POSIXct(TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")]
 ```
 
 #Creates a variable to input a date range for the plots in the flux section of
@@ -971,7 +973,7 @@ ggplot(data = diel)+geom_hline(yintercept = 0)+
 
 ```{r, warning=FALSE}
 df <- df[!duplicated(df$TIMESTAMP), ]
-
+df$TIMESTAMP <- format(as.POSIXct(df$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
 write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/toolik_flux_c_met_c_202505_202512.csv',row.names = F,quote = F)
 ```
 
