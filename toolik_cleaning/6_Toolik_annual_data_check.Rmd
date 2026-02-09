@@ -1356,10 +1356,8 @@ for (m in months) {
 #POTENTIAL RADIATION VS SWIN - TIME ALIGNMENT CHECK
 
 ```{r, warning=FALSE}
+
 generate_two_week_plots_rad <- function(df, timestamp_col, value_col) {
-  
-  library(ggplot2)
-  library(dplyr)
   
   # Ensure timestamp is POSIXct
   df[[timestamp_col]] <- as.POSIXct(df[[timestamp_col]], tz = "UTC")

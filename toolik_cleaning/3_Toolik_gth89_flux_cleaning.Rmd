@@ -530,7 +530,7 @@ ggplot(data = df)+
   geom_ribbon(aes(x = ts,ymax = Flux_filt+roll.mad*1,ymin = Flux_filt-roll.mad*1,fill='1'))+
   geom_point(aes(ts,co2fluxclean),col='red')+
   geom_point(aes(ts,co2_flux.c),col='black')+
-  scale_y_continuous(limits = c(-10,10))
+  scale_y_continuous(limits = c(-18,18))
 ```
 
 ## CH4

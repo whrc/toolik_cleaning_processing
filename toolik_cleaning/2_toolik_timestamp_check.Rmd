@@ -79,7 +79,7 @@ m <- as.numeric(format(seq(from = mindate,
                           by = 60*30),'%M'))
 H <- h+ifelse(m == 30,0.5,0)
 
-rpot <- potential.radiation(doy = JD,hour = H,latDeg = 68.53,longDeg = -149.55,timezone = -6,useSolartime = F)*1.1
+rpot <- potential.radiation(doy = JD,hour = H,latDeg = 68.5272,longDeg = -149.5491,timezone = -9,useSolartime = F)*1.1
 
 rpot <- as.data.frame(cbind(TIMESTAMP, rpot))
 
@@ -126,7 +126,7 @@ generate_two_week_plots_rad <- function(df, timestamp_col, value_col) {
   # The base plot object (data and aesthetics are defined once)
   base_plot <- ggplot(data = df)+
     aes(x = .data[[timestamp_col]], y = .data[[value_col]]) +
-    geom_point(aes(x = .data[[timestamp_col]], y = .data[[value_col]], color = .data[["radflag"]])) +
+    geom_point(aes(x = .data[[timestamp_col]]-3600, y = .data[[value_col]], color = .data[["radflag"]])) + #be aware of the - 1 hour!! 
     geom_line(aes(x = .data[[timestamp_col]], y = .data[["rpot"]]), color = "blue")+
     labs(x = "Time", y = value_col) +
     theme_minimal()
