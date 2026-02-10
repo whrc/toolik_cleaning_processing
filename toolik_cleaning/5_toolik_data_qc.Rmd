@@ -976,7 +976,7 @@ p_G <- plot_flux_single(df, flux_col = "G",
                         color = "blue",
                         date_breaks = "1 month",
                         date_labels = "%b",
-                        smooth = T)
+                        smooth = F)
 p_G
 ```
 ## Monthly Heat Flux (G)
@@ -1216,18 +1216,37 @@ generate_rad_plots <- function(df,
                                mode = "biweekly",
                                month_start = NULL) {
   
+  # --- Time handling ---
   df[[timestamp_col]] <- as.POSIXct(df[[timestamp_col]], tz = "UTC")
   
-  # Clean radflag so legend never shows NA
+  # Keep a FULL copy for rpot 
+  df_full <- df
+  
+  # Filter ONLY for points/legend cleanliness
   df <- df[!is.na(df$radflag), ]
   df$radflag <- factor(df$radflag, levels = c(0, 1))
   
-  # ----- Base plot -----
-  base_plot <- ggplot(df,
-                      aes(x = .data[[timestamp_col]],
-                          y = .data[[value_col]])) +
-    geom_point(aes(color = radflag), alpha = 0.7) +
-    geom_line(aes(y = rpot), color = "blue") +
+  # ----- Base plot (no data attached yet) -----
+  base_plot <- ggplot() +
+    
+    # rpot from FULL continuous dataset
+    geom_line(
+      data = df_full,
+      aes(x = .data[[timestamp_col]], y = rpot),
+      color = "blue",
+      linewidth = 0.6,
+      na.rm = TRUE
+    ) +
+    
+    # measured radiation from filtered dataset
+    geom_point(
+      data = df,
+      aes(x = .data[[timestamp_col]],
+          y = .data[[value_col]],
+          color = radflag),
+      alpha = 0.7
+    ) +
+    
     labs(x = "", y = value_col, color = "Rad Flag") +
     theme_minimal() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
@@ -1239,12 +1258,12 @@ generate_rad_plots <- function(df,
     )
   
   # =========================================================
-  # MODE 1 — BIWEEKLY ACROSS ENTIRE DATASET
+  # MODE 1 — BIWEEKLY
   # =========================================================
   if (mode == "biweekly") {
     
-    start_datetime <- min(df[[timestamp_col]], na.rm = TRUE)
-    end_datetime   <- max(df[[timestamp_col]], na.rm = TRUE)
+    start_datetime <- min(df_full[[timestamp_col]], na.rm = TRUE)
+    end_datetime   <- max(df_full[[timestamp_col]], na.rm = TRUE)
     interval <- 14 * 24 * 3600
     
     current_start <- start_datetime
@@ -1276,7 +1295,7 @@ generate_rad_plots <- function(df,
   }
   
   # =========================================================
-  # MODE 2 — WEEKLY INSIDE A SPECIFIED MONTH
+  # MODE 2 — WEEKLY INSIDE A MONTH
   # =========================================================
   if (mode == "weekly_month") {
     
@@ -1286,6 +1305,9 @@ generate_rad_plots <- function(df,
     
     month_start <- as.POSIXct(month_start, tz = "UTC")
     month_end <- seq(month_start, length = 2, by = "1 month")[2]
+    
+    df_month_full <- df_full[df_full[[timestamp_col]] >= month_start &
+                               df_full[[timestamp_col]] < month_end, ]
     
     df_month <- df[df[[timestamp_col]] >= month_start &
                      df[[timestamp_col]] < month_end, ]
@@ -1301,7 +1323,34 @@ generate_rad_plots <- function(df,
       start_w <- min(dfw[[timestamp_col]])
       end_w   <- max(dfw[[timestamp_col]])
       
-      p <- base_plot %+% dfw +
+      p <- ggplot() +
+        
+        # rpot still from FULL month data
+        geom_line(
+          data = df_month_full,
+          aes(x = .data[[timestamp_col]], y = rpot),
+          color = "blue",
+          linewidth = 0.6,
+          na.rm = TRUE
+        ) +
+        
+        geom_point(
+          data = dfw,
+          aes(x = .data[[timestamp_col]],
+              y = .data[[value_col]],
+              color = radflag),
+          alpha = 0.7
+        ) +
+        
+        labs(x = "", y = value_col, color = "Rad Flag") +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1),
+              legend.position = "top") +
+        scale_color_manual(
+          values = c("0" = "black", "1" = "red"),
+          breaks = c("0", "1"),
+          drop = TRUE
+        ) +
         ggtitle(paste0(
           "Week ", w, ": ",
           format(start_w, "%b %d"),
