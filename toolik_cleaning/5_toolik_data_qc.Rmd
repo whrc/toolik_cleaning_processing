@@ -72,7 +72,7 @@ color_map = c("0" = "yellow3", "1" = "darkblue" , "2" =  "red4", "3" = "orange",
 ```
 
 # Add any calculations that you want to keep throughout (make sure to adjust accordingly to site)
-```{r, warning=FALSE}
+```{r, warning=FALSE, echo=FALSE}
 
 df$G = (df$SHF_6_37_1_1_1.c + df$SHF_6_37_2_1_1.c)/2  # SOIL HEAT FLUX
 
@@ -97,13 +97,13 @@ df$shf_avg = rowMeans(
 )
 
 df <- df %>%
-  mutate(across(c(SWC_12_36_1_1_1.c, SWC_12_36_1_2_1.c, SWC_12_36_1_3_1.c), ~ .x * 100)) # convert to %
+  mutate(across(c(SWC_12_36_1_1_1.c, SWC_12_36_2_1_1.c, SWC_12_36_3_1_1.c), ~ .x * 100)) # convert to %
 
 ```
 
 # SUBSET MONTH AND WEEKS
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, echo=FALSE}
 
 
 make_week_index <- function(df, time_col = "TIMESTAMP") {
@@ -131,7 +131,7 @@ df_month <- make_week_index(df_month)
 
 #BUILD A PLOTTING FUNCTION FOR CO2 AND CH4
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, echo=FALSE}
 
 plot_flux <- function(df, flux_base,
                       ylims, y_label,
@@ -170,7 +170,7 @@ plot_flux <- function(df, flux_base,
 
 # MAKE FUNCTION TO PLOT WEEKS OF CURRENT MONTH
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, echo=FALSE}
 
 plot_week_flux <- function(df, week_num,
                            flux_base,
@@ -512,7 +512,7 @@ diurnal_u.
 
 #### Full Year-to-date COLOR CODED
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, echo=FALSE}
 
 # Replace rows where both SHF were missing
 both_missing <- is.na(df$SHF_6_37_1_1_1.c) & is.na(df$SHF_6_37_2_1_1.c)
@@ -593,7 +593,7 @@ eb_month
 ```
 ##### Plot Builder Functions
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, echo=FALSE}
 
 break_gaps <- function(df, ts_col, value_col, max_gap_minutes = 60) {
     df <- as.data.frame(df) 
@@ -749,6 +749,7 @@ plot_flux_long <- function(df, ts_col = "TIMESTAMP",
   })
   
   df_long <- do.call(rbind, raw_list)
+  df_long$variable <- factor(df_long$variable, levels = cols)
   
   p <- ggplot(df_long, aes(x = .data[[ts_col]], y = value, color = variable)) +
     geom_line(alpha = 0.6, linewidth = 0.8) + 
@@ -793,6 +794,7 @@ plot_flux_long <- function(df, ts_col = "TIMESTAMP",
     })
     
     df_smooth <- do.call(rbind, smooth_list)
+    df_smooth$variable <- factor(df_smooth$variable, levels = cols)
     
     p <- p + geom_line(
       data = df_smooth,
@@ -1246,7 +1248,7 @@ windRose(df_wind_openair,
 
 #POTENTIAL RADIATION VS SWIN - TIME ALIGNMENT CHECK
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, echo=FALSE}
 
 generate_rad_plots <- function(df,
                                timestamp_col,
@@ -1407,6 +1409,7 @@ generate_rad_plots <- function(df,
     }
   }
 }
+
 
 
 ```
