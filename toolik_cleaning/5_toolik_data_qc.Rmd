@@ -96,6 +96,9 @@ df$shf_avg = rowMeans(
   na.rm = TRUE
 )
 
+df <- df %>%
+  mutate(across(c(SWC_12_36_1_1_1.c, SWC_12_36_1_2_1.c, SWC_12_36_1_3_1.c), ~ .x * 100)) # convert to %
+
 ```
 
 # SUBSET MONTH AND WEEKS
@@ -990,6 +993,41 @@ p_G <- plot_flux_single(df_month, flux_col = "G",
                         #smooth = FALSE)
 p_G
 ```
+
+#### Year to Date Soil Moisture
+```{r, warning=FALSE, echo=FALSE}
+
+P_soilM <- plot_flux_long(
+  df,
+  cols = c("SWC_12_36_1_1_1.c",
+           "SWC_12_36_2_1_1.c",
+           "SWC_12_36_3_1_1.c"),
+  labels = c("8 cm", "18 cm", "28 cm"),
+  colors = c("blue", "green", "gold3"),
+  y_label = "Soil Moisture (%)",
+  title = "Soil Moisture by Depth")
+P_soilM
+
+```
+
+#### Monthly Soil Moisture
+```{r, warning=FALSE, echo=FALSE}
+P_soilM <- plot_flux_long(
+  df_month,
+  cols = c("SWC_12_36_1_1_1.c",
+           "SWC_12_36_2_1_1.c",
+           "SWC_12_36_3_1_1.c"),
+  labels = c("8 cm", "18 cm", "28 cm"),
+  colors = c("blue", "green", "gold3"),
+  y_label = "Soil Moisture (%)",
+  title = "Soil Moisture by Depth",
+  date_breaks = "2 days",
+  date_labels = "%b %d")
+
+P_soilM
+
+```
+
 #### Year to Date Soil Temperatures
 ```{r, warning=FALSE, echo=FALSE}
 

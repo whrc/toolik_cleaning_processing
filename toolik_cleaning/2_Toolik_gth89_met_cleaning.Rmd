@@ -203,7 +203,7 @@ ggplot(data = df)+
 # -------------------------------
 cutoff_time = as.POSIXct("2025-07-01 11:30", tz = "UTC")  
 
-
+df$SHF_6_37_1_1_1.c <- df$SHF_6_37_1_1_1
 # Set to NA if outside limits OR before cutoff
 df$SHF_6_37_1_1_1.c[df$SHF_6_37_1_1_1 < -55 | 
                      df$SHF_6_37_1_1_1 > 190 | 
@@ -229,6 +229,8 @@ abline(v = cutoff_time, col = "blue", lty = 2)  # show cutoff
 # -------------------------------
 
 cutoff_time <- as.POSIXct("2025-07-01 11:30", tz = "UTC")
+
+df$SHF_6_37_2_1_1.c <- df$SHF_6_37_2_1_1
 
 df$SHF_6_37_2_1_1.c[
   df$SHF_6_37_2_1_1 < -75 |
@@ -421,7 +423,7 @@ ggplot(df)+geom_hline(yintercept = 0)+
 
 ```{r, warning=FALSE}
 #adjust this value (N) to tweak how many MADs to be away from the norm
-N = 5
+N = 4
 
 #Add clean value to dataframe (_.c)
 
