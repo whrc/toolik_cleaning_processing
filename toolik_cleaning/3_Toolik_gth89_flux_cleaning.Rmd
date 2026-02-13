@@ -35,28 +35,6 @@ Load in eddypro output files
 
 ```{r warning=FALSE}
 
-#met = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202505_202512.csv')
-
-#df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202512.csv')
-#df = fread("C:/Users/klynoe/Documents/toolik/eddypro_output/2025/09/eddypro_09_25_full_output_2025-10-06T120635_adv.csv", skip = 3, header = F, na.strings = c('-9999','NA','NaN','NAN','-7999'))
-#h = fread("C:/Users/klynoe/Documents/toolik/eddypro_output/2025/09/eddypro_09_25_full_output_2025-10-06T120635_adv.csv",skip = 1,nrows = 0)
-
-#names(df) = names(h)
-
-#df$TIMESTAMP = paste(df$date, df$time)
-#df$TIMESTAMP = as.POSIXct(df$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
-#met$TIMESTAMP = as.POSIXct(met$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
-
-
-#df= merge(df,met,by='TIMESTAMP',all = T)
-
-#check time stamps to ensure we have a complete series
-#TIMESTAMP = seq(from = min(df$TIMESTAMP), to = max(df$TIMESTAMP),by = 60*30,tz = "UTC")
-#tsdf = as.data.frame(TIMESTAMP)
-
-#df = merge(tsdf, df, by = "TIMESTAMP", all = T)
-
-#summary(df)
 
 
 ```
@@ -302,6 +280,7 @@ df$ch4_flux.flag[limit_fail_ch4 & df$ch4_flux.flag != 2] <- 3
 ch4_flux.limits <- df$ch4_flux
 ch4_flux.limits[limit_fail_ch4] <- NA
 
+df$ch4_flux.limits = ch4_flux.limits
 # Quick check
 hist(df$ch4_flux.limits, breaks = 100)
 plot(df$ts, df$ch4_flux.limits)
@@ -412,7 +391,7 @@ LEclean = ifelse(is.na(LE.qc) | is.na(LE.limits),NA,df$LE)
 Tauclean = ifelse(is.na(Tau.qc) | is.na(Tau.limits),NA,df$Tau)
 
 plot(df$ts,co2fluxclean)
-#plot(df$ts,ch4fluxclean)
+plot(df$ts,ch4fluxclean)
 plot(df$ts,Hclean)
 plot(df$ts,LEclean)
 plot(df$ts,Tauclean)
@@ -465,7 +444,7 @@ now filter the data based on this signal
 ## Use 3 here for 7200 summer, 7 for 7200 winter; in future use 4 for 7500
 
 N.summer = 3
-N.winter = 7
+N.winter = 6
 #Add clean value to dataframe (_.c)
 df$co2_flux.c <- ifelse(
   df$season == "summer",
@@ -476,8 +455,8 @@ df$co2_flux.c <- ifelse(
 ggplot(data = df)+geom_hline(yintercept = 0)+
   geom_point(aes(TIMESTAMP,co2_flux),col='red')+
   geom_point(aes(TIMESTAMP,co2_flux.c),col='black')+
-  scale_y_continuous(limits=c(-1,1))+
-  scale_x_datetime(limits = as.POSIXct(c("2025-05-14","2025-08-20")))
+  scale_y_continuous(limits=c(-15,15))+
+  scale_x_datetime(limits = as.POSIXct(c("2025-05-14","2025-12-20")))
 ```
 
 
