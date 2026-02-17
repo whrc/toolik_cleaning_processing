@@ -49,6 +49,15 @@ df <- fread('./toolik_flux_c_met_c_202505_202512.csv')
 
 df$TIMESTAMP <- as.POSIXct( paste(df$TIMESTAMP, "00:00"), format = "%Y-%m-%d %H:%M", tz = "UTC")
 
+full_time <- data.frame(
+  TIMESTAMP = seq(min(df$TIMESTAMP),
+                  max(df$TIMESTAMP),
+                  by = "30 mins")
+)
+
+df <- merge(full_time, df, by = "TIMESTAMP", all.x = TRUE)
+
+
 # data formatting for flag plots
 # Ensure flags are character first
 df$co2_flux.flag <- as.character(df$co2_flux.flag)
@@ -74,22 +83,20 @@ color_map = c("0" = "yellow3", "1" = "darkblue" , "2" =  "red4", "3" = "orange",
 # Add any calculations that you want to keep throughout (make sure to adjust accordingly to site)
 ```{r, warning=FALSE, echo=FALSE}
 
+##NOTE! NEVER USE filter(!is.na) - it'll break timeseries potentially - use ifelse
+
 df$G = (df$SHF_6_37_1_1_1.c + df$SHF_6_37_2_1_1.c)/2  # SOIL HEAT FLUX
 
-df<- df %>%
-  filter(!is.na(SD_10_99_1_1_1)) %>%
-  mutate(
-    SD_cm = (SD_10_99_1_1_1 - (-2.06)) * 10  # adjust and convert to cm - SNOW DEPTH
-  )
-
+df <- df %>% mutate(SD_cm = ifelse(is.na(SD_10_99_1_1_1),NA,
+      (SD_10_99_1_1_1 - (-2.06)) * 10 ))  # adjust and convert to cm - SNOW DEPTH
+    
 df <- df %>% mutate(sonic_c = sonic_temperature - 273.15) # - SONIC TEMP
 
-df <- df %>% filter(!is.na(air_pressure)) %>% mutate(air_pressure_kpa = air_pressure / 1000) # -SONIC PRESSURE
-
+df <- df %>% mutate(air_pressure_kpa = ifelse( is.na(air_pressure), NA, #- SONIC PRESSURE
+      air_pressure / 1000))
 
 df$Rn <- df$LWIN_6_14_1_1_1.c + df$SWIN_6_10_1_1_1.c -      # Compute net radiation 
          df$LWOUT_6_15_1_1_1.c - df$SWOUT_6_11_1_1_1.c
-
 
 df$shf_avg = rowMeans(
   df[, c("SHF_6_37_1_1_1.c", "SHF_6_37_2_1_1.c")],     # Compute SHF safely with fallback 
@@ -595,18 +602,22 @@ eb_month
 
 ```{r, warning=FALSE, echo=FALSE}
 
-break_gaps <- function(df, ts_col, value_col, max_gap_minutes = 60) {
-    df <- as.data.frame(df) 
+break_gaps <- function(df, ts_col, value_col, max_gap_minutes = 90) {
+
   df <- df[order(df[[ts_col]]), ]
-  
-  dt <- as.numeric(diff(df[[ts_col]]), units = "mins")
-  gap <- c(FALSE, dt > max_gap_minutes)
-  
-  # Insert NA where gap occurs so geom_line breaks
+
+  dt <- as.numeric(difftime(df[[ts_col]],
+                            dplyr::lag(df[[ts_col]]),
+                            units = "mins"))
+
+  gap <- dt > max_gap_minutes
+  gap[is.na(gap)] <- FALSE   # fix first NA safely
+
   df[[value_col]][gap] <- NA
-  
+
   df
 }
+
 
 roll_vars <- c(                         # ADD VARIABLE THAT YOU WANT TO HAVE ROOLING AVERAGE 
   "H.c",
@@ -740,7 +751,7 @@ plot_flux_long <- function(df, ts_col = "TIMESTAMP",
   # -------------------------------
   raw_list <- lapply(cols, function(v) {
     
-    dfv <- as.data.frame(df[, c(ts_col, v), with = FALSE])
+    dfv <- df[, c(ts_col, v), drop = FALSE]
     names(dfv) <- c(ts_col, "value")
     dfv$variable <- v
     
@@ -771,7 +782,7 @@ plot_flux_long <- function(df, ts_col = "TIMESTAMP",
     
     smooth_list <- lapply(cols, function(v) {
       
-      dfv <- as.data.frame(df[, c(ts_col, v), with = FALSE])
+      dfv <- df[, c(ts_col, v), drop = FALSE]
       names(dfv) <- c(ts_col, "value")
       dfv$variable <- v
       
