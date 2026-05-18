@@ -695,7 +695,7 @@ segment_id <- cumsum(gap_flag)
   # ONLY smooth valid segments
   if (length(idx) == 0) next
 
-  if (length(idx) < k) next
+  if (length(idx) < k) next     #if (length(idx) < min_obs) next - more relaxed sampling for edge coverage 
 
   sm <- zoo::rollapply(
     df[[value_col]][idx],
