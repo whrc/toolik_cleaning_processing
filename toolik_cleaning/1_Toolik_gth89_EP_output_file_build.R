@@ -96,7 +96,7 @@ write.csv(df,'C:/Users/klynoe/Documents/pond_inlet/R_outputs/pond_inlet_fluxes_m
 
 
 df1 = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
-df2 = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet_until20251027.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
+df2 = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet_until20260424.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
 h = fread("C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat",skip=1, nrows = 0 , na.strings = c('-9999','NA','NaN','NAN','-7999'))
 
 df = merge(df1,df2, all = T)
@@ -109,7 +109,7 @@ df = df[!duplicated(df$TIMESTAMP),]
 
 df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, tz = "UTC")
 
-timestamp_cutoff <- as.POSIXct("2025-05-01 14:00", format = "%Y-%m-%d %H:%M", tz = "UTC")
+timestamp_cutoff <- as.POSIXct("2026-01-01 14:00", format = "%Y-%m-%d %H:%M", tz = "UTC")
 df <- df %>%
   dplyr::filter(TIMESTAMP >= timestamp_cutoff)
 
@@ -125,9 +125,40 @@ tsdf <- data.frame(TIMESTAMP = seq(
 df = merge(tsdf,df,by = 'TIMESTAMP',all.x = T)
 
 
-write.csv(df, "C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik-gth89-AllBiomet.csv", row.names = F)
+write.csv(df, "C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik-gth89-AllBiomet26.csv", row.names = F)
+
+###############
+
+df = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet_until20260424.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
+h = fread("C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet_until20260424.dat",skip=1, nrows = 0 , na.strings = c('-9999','NA','NaN','NAN','-7999'))
 
 
+
+names(df) = names(h)
+
+#df = rbind.fill(df,met)
+df = df[!duplicated(df$TIMESTAMP),]
+
+
+df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, tz = "UTC")
+
+timestamp_cutoff <- as.POSIXct("2026-01-01 14:00", format = "%Y-%m-%d %H:%M", tz = "UTC")
+df <- df %>%
+  dplyr::filter(TIMESTAMP >= timestamp_cutoff)
+
+
+# Create a complete sequence of timestamps at 30-minute intervals
+tsdf <- data.frame(TIMESTAMP = seq(
+  from = min(df$TIMESTAMP),
+  to = max(df$TIMESTAMP),
+  by = 60*30
+))
+
+
+df = merge(tsdf,df,by = 'TIMESTAMP',all.x = T)
+
+
+write.csv(df, "C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik-gth89-AllBiomet2603.csv", row.names = F)
 
 
 
