@@ -49,7 +49,7 @@ library(openair)
 
 setwd('C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/')
 
-df <- fread('./toolik_flux_c_met_c_202505_202512.csv')
+df <- fread('./toolik_flux_c_met_c_202603_04.csv')
 
 df$TIMESTAMP <- as.POSIXct( paste(df$TIMESTAMP, "00:00"), format = "%Y-%m-%d %H:%M", tz = "UTC")
 

@@ -16,7 +16,7 @@ library(lubridate)
 ####################################################################
 
 #load in the full output flux data ##################
-fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/2025'
+fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/2026'
 #fp = 'C:/Users/klynoe/Documents/pond_inlet/202410_full/eddypro/full_output/2024'
 files = list.files(path = fp,pattern = '*full_output.+csv$',recursive = T,full.names = T)
 
@@ -60,14 +60,14 @@ df = merge(ts,df,by = 'ts',all.x = T)
 
 
 #save off flux data
-write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202512.csv',row.names = F)
+write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202603_202604.csv',row.names = F)
 
 
 ################
 ####SINGLE FILE EDDYPRO PREPARATION####
 ####################################
 
-fp = fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/2025'### CHANGE MONTH TO WHICH YOU WANT TO LOAD
+fp = fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/2026'### CHANGE MONTH TO WHICH YOU WANT TO LOAD
 file = list.files(path = fp,pattern = '*full_output.+csv$',recursive = T,full.names = T)
 
 
@@ -87,7 +87,7 @@ df$ts = as.POSIXct(x = paste(df$date,df$time,sep = ' '),tz = 'UTC')
 df = df[!duplicated(df$ts),]
 
 #save off flux data -----> remember to rename the output file as desired
-write.csv(df,'C:/Users/klynoe/Documents/pond_inlet/R_outputs/pond_inlet_fluxes_merged_2025_05_31.csv',row.names = F)
+write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202603_202604.csv',row.names = F)
 
 ############################################
 ##########################################################
@@ -95,11 +95,11 @@ write.csv(df,'C:/Users/klynoe/Documents/pond_inlet/R_outputs/pond_inlet_fluxes_m
   ########
 
 
-df1 = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
-df2 = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet_until20260424.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
+df = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
+#df2 = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet_until20260424.dat",skip=4, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
 h = fread("C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat",skip=1, nrows = 0 , na.strings = c('-9999','NA','NaN','NAN','-7999'))
 
-df = merge(df1,df2, all = T)
+#df = merge(df1,df2, all = T)
 
 names(df) = names(h)
 
@@ -125,7 +125,7 @@ tsdf <- data.frame(TIMESTAMP = seq(
 df = merge(tsdf,df,by = 'TIMESTAMP',all.x = T)
 
 
-write.csv(df, "C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik-gth89-AllBiomet26.csv", row.names = F)
+write.csv(df, "C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik-gth89-AllBiomet2605.csv", row.names = F)
 
 ###############
 
@@ -142,7 +142,7 @@ df = df[!duplicated(df$TIMESTAMP),]
 
 df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, tz = "UTC")
 
-timestamp_cutoff <- as.POSIXct("2026-01-01 14:00", format = "%Y-%m-%d %H:%M", tz = "UTC")
+timestamp_cutoff <- as.POSIXct("2026-04-30 14:00", format = "%Y-%m-%d %H:%M", tz = "UTC")
 df <- df %>%
   dplyr::filter(TIMESTAMP >= timestamp_cutoff)
 
@@ -158,7 +158,7 @@ tsdf <- data.frame(TIMESTAMP = seq(
 df = merge(tsdf,df,by = 'TIMESTAMP',all.x = T)
 
 
-write.csv(df, "C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik-gth89-AllBiomet2603.csv", row.names = F)
+write.csv(df, "C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik-gth89-AllBiomet2605.csv", row.names = F)
 
 
 

@@ -40,7 +40,7 @@ Load in eddypro output files
 ```
 
 ```{r, warning=FALSE}
-df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202505_202512.csv')
+df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202603_04.csv')
 
 df[, TIMESTAMP := as.POSIXct(TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")]
 ```
@@ -48,7 +48,7 @@ df[, TIMESTAMP := as.POSIXct(TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")]
 #Creates a variable to input a date range for the plots in the flux section of
 #cleaning code. Used to easily change date range for different data sets. 
 ```{r, warning=FALSE}
-flux_dates <- c("2025-05-01",'2025-12-16')
+flux_dates <- c("2026-03-01",'2026-05-01')
 ```
 
 #Create Flags
@@ -138,7 +138,7 @@ create and plot mismatch variable between met and flux
 
 df$mismatch = df$flux/df$met
 
-mismatch.limits = ifelse(df$mismatch > 10 & df$mismatch < -10, NA,mismatch.limits)
+mismatch.limits = ifelse(df$mismatch > 10 & df$mismatch < -10, NA,df$mismatch)
 
 mismatch.limits = replace(df$mismatch, df$mismatch < -10 | df$mismatch > 10,NA)
 
@@ -251,7 +251,7 @@ Plot CH4 Histogram and what we might clean
 ```{r, warning=FALSE}
 hist(df$ch4_flux,breaks=100)
 
-plot(df$ts,df$ch4_flux,ylim = c(-.3,.35));abline(h=.3, col= 'red');abline(h=-.20, col='red'); abline(h=0,col= 'black')
+plot(df$ts,df$ch4_flux,ylim = c(-.03,.035));abline(h=.3, col= 'red');abline(h=-.20, col='red'); abline(h=0,col= 'black')
 ```
 
 Clean based on graphs, create new variable (ch4_flux.limits), and see cleaned product
@@ -305,8 +305,8 @@ plot(df$ts,df$H,ylim = c(-250,450));abline(h=-150, col= 'red');abline(h=360, col
 Clean based on graphs, create new variable (H.limits), and see cleaned product
 
 ```{r, warning=FALSE}
-# Define absolute limits
-H_upper <- 360
+# Define absolute limits - these will vary greatly depending on time of year
+H_upper <- 100
 H_lower <- -150
 
 # Create a "limited" vector for plotting and filtering
@@ -336,7 +336,7 @@ Clean based on graphs, create new variable (H.limits), and see cleaned product
 
 ```{r, warning=FALSE}
 # Define absolute limits
-LE_upper <- 390
+LE_upper <- 100
 LE_lower <- -40
 
 # Create a "limited" vector for plotting and filtering
@@ -455,8 +455,8 @@ df$co2_flux.c <- ifelse(
 ggplot(data = df)+geom_hline(yintercept = 0)+
   geom_point(aes(TIMESTAMP,co2_flux),col='red')+
   geom_point(aes(TIMESTAMP,co2_flux.c),col='black')+
-  scale_y_continuous(limits=c(-15,15))+
-  scale_x_datetime(limits = as.POSIXct(c("2025-05-14","2025-12-20")))
+  scale_y_continuous(limits=c(-15,15))
+  #scale_x_datetime(limits = as.POSIXct(c("2026-04-13","2026-04-17")))
 ```
 
 
@@ -525,8 +525,9 @@ scale_color_manual(values = color_map, name = "QC CO2 Flux")
   geom_point(aes(TIMESTAMP,co2_flux,color = co2_flux.flag))+
   geom_point(aes(TIMESTAMP,co2_flux.c),col='black')+
   scale_y_continuous(limits=c(-12,8))+
-  scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
-scale_color_manual(values = color_map, name = "QC CO2 Flux")  
+  #scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
+scale_color_manual(values = color_map, name = "QC CO2 Flux")+
+   scale_x_datetime(limits = as.POSIXct(c("2026-04-13","2026-04-17")))
 ```
 
 
@@ -984,7 +985,7 @@ ggplot(data = diel)+geom_hline(yintercept = 0)+
 ```{r, warning=FALSE}
 df <- df[!duplicated(df$TIMESTAMP), ]
 df$TIMESTAMP <- format(as.POSIXct(df$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/toolik_flux_c_met_c_202505_202512.csv',row.names = F,quote = F)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/toolik_flux_c_met_c_202603_04.csv',row.names = F,quote = F)
 ```
 
 #NEST AND SPLIT THE DATA BY MONTH AND SAVE IN DESIRED DIRECTORY
