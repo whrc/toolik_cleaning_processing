@@ -33,8 +33,11 @@ library(bigleaf) # for radiation check
 Load data
 ```{r}
 
-met <- fread('C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet_until20260424.csv')
-df <- fread('C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202603_202604.csv')
+met <- fread('C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.csv')
+#df <- fread('C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202603_202604.csv')
+df <- fread('C:/Users/klynoe/Documents/toolik/eddypro_output/2026/eddypro_toolik-gth89_2026_05.75.csv')
+
+df <- fread ("C:/Users/klynoe/Documents/toolik/R_outputs/GTH89_flux_biomet_tms_combined_2025_2026.csv")
 
 ```
 
@@ -47,6 +50,7 @@ met$TIMESTAMP = as.POSIXct(met$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
 #Merge here
 df= merge(df,met,by='TIMESTAMP',all = T)
 
+
 #check time stamps to ensure we have a complete series
 TIMESTAMP = seq(from = min(df$TIMESTAMP), to = max(df$TIMESTAMP),by = 60*30,tz = "UTC")
 tsdf = as.data.frame(TIMESTAMP)
@@ -55,8 +59,9 @@ df = merge(tsdf,df,by = "TIMESTAMP",all = T)
 
 rm(met, tsdf)
 
-cutoff_date <- as.POSIXct("2026-02-28 23:59:59", format = "%Y-%m-%d %H:%M:%S", tz = "UTC") #tower was back on second week of march
+cutoff_date <- as.POSIXct("2026-04-30 23:59:59", format = "%Y-%m-%d %H:%M:%S", tz = "UTC") #tower was back on second week of march
 df<- df[df$TIMESTAMP > cutoff_date, ]
+
 ```
 
 
@@ -352,7 +357,7 @@ view_all_generated_plots_temp()
 ```{r}
 df <- df[!duplicated(df$TIMESTAMP), ]
 df$TIMESTAMP <- format(as.POSIXct(df$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/toolik_met_flux_merged_aligned_202603_04.csv',row.names = F,quote = F)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/toolik_met_flux_merged_aligned_2025_2026.csv',row.names = F,quote = F)
 
 ```
 

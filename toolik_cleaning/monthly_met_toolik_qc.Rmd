@@ -1,0 +1,580 @@
+---
+title: "monthly_met_qc_TOOLIK"
+author: "Kaj"
+date: "2026-06-08"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  error = TRUE
+)
+
+rm(list = ls())
+
+library(data.table)
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(zoo)
+library(openair)
+library(patchwork)
+library(scales)
+library(tidyr)
+library(bigleaf)
+```
+
+# Load Data
+
+```{r}
+df <- fread(
+  "C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202605.csv"
+)
+
+df$TIMESTAMP <- as.POSIXct(
+  paste(df$TIMESTAMP, "00:00"),
+  format = "%Y-%m-%d %H:%M",
+  tz = "UTC"
+)
+
+full_time <- data.frame(
+  TIMESTAMP = seq(
+    min(df$TIMESTAMP),
+    max(df$TIMESTAMP),
+    by = "30 mins"
+  )
+)
+
+df <- merge(
+  full_time,
+  df,
+  by = "TIMESTAMP",
+  all.x = TRUE
+)
+```
+
+# Derived Variables
+
+```{r}
+df$G <- (
+  df$SHF_6_37_1_1_1.c +
+  df$SHF_6_37_2_1_1.c
+)/2
+
+
+df$Rn <-
+  df$LWIN_6_14_1_1_1.c +
+  df$SWIN_6_10_1_1_1.c -
+  df$LWOUT_6_15_1_1_1.c -
+  df$SWOUT_6_11_1_1_1.c
+
+df <- df %>%
+  mutate(
+    across(
+      c(
+        SWC_12_36_1_1_1.c,
+        SWC_12_36_2_1_1.c,
+        SWC_12_36_3_1_1.c
+      ),
+      ~ .x * 100
+    )
+  )
+```
+
+# Monthly Subset
+
+```{r}
+month_start <- "2026-05-01"
+
+make_week_index <- function(df){
+
+  start_month <- as.POSIXct(
+    format(min(df$TIMESTAMP),
+           "%Y-%m-01 00:00"),
+    tz = "UTC"
+  )
+
+  df$week_in_month <- floor(
+    as.numeric(
+      difftime(
+        df$TIMESTAMP,
+        start_month,
+        units = "days"
+      )
+    ) / 7
+  ) + 1
+
+  df
+}
+
+df_month <- subset(
+  df,
+  TIMESTAMP >= as.POSIXct(
+    month_start,
+    tz = "UTC"
+  )
+)
+
+df_month <- make_week_index(df_month)
+```
+
+# Functions
+
+```{r}
+break_gaps <- function(
+  df,
+  ts_col,
+  value_col,
+  max_gap_minutes = 90
+){
+
+  df <- df[order(df[[ts_col]]), ]
+
+  dt <- as.numeric(
+    difftime(
+      df[[ts_col]],
+      dplyr::lag(df[[ts_col]]),
+      units = "mins"
+    )
+  )
+
+  gap <- dt > max_gap_minutes
+  gap[is.na(gap)] <- FALSE
+
+  df[[value_col]][gap] <- NA
+
+  df
+}
+```
+
+```{r}
+plot_met_single <- function(
+  df,
+  variable,
+  ylab,
+  title,
+  color = "blue"
+){
+
+  df <- break_gaps(
+    df,
+    "TIMESTAMP",
+    variable
+  )
+
+  ggplot(
+    df,
+    aes(
+      TIMESTAMP,
+      .data[[variable]]
+    )
+  ) +
+    geom_line(
+      color = color
+    ) +
+    theme_minimal() +
+    labs(
+      x = "",
+      y = ylab,
+      title = title
+    )
+}
+```
+
+```{r}
+plot_met_long <- function(
+  df,
+  cols,
+  labels,
+  colors,
+  ylab,
+  title
+){
+
+  dfl <- pivot_longer(
+    df,
+    all_of(cols),
+    names_to = "variable",
+    values_to = "value"
+  )
+
+  dfl$variable <- factor(
+    dfl$variable,
+    levels = cols,
+    labels = labels
+  )
+
+  ggplot(
+    dfl,
+    aes(
+      TIMESTAMP,
+      value,
+      color = variable
+    )
+  ) +
+    geom_line() +
+    scale_color_manual(
+      values = colors
+    ) +
+    theme_minimal() +
+    labs(
+      x = "",
+      y = ylab,
+      title = title,
+      color = NULL
+    )
+}
+```
+
+# Air Temperature
+
+## Monthly
+
+```{r}
+plot_met_single(
+  df_month,
+  "TA_2_1_1_1_1.c",
+  "Air Temperature (°C)",
+  "Monthly Air Temperature",
+  "red"
+)
+```
+
+## Weekly
+
+```{r}
+for(w in sort(unique(df_month$week_in_month))){
+
+  p <- plot_met_single(
+    subset(
+      df_month,
+      week_in_month == w
+    ),
+    "TA_2_1_1_1_1.c",
+    "Air Temperature (°C)",
+    paste(
+      "Week",
+      w,
+      "Air Temperature"
+    ),
+    "red"
+  )
+
+  print(p)
+}
+```
+
+# Relative Humidity
+
+```{r}
+plot_met_single(
+  df_month,
+  "RH.c",
+  "RH (%)",
+  "Relative Humidity",
+  "steelblue"
+)
+```
+
+# Air Pressure
+
+```{r}
+plot_met_single(
+  df_month,
+  "PA_4_2_1_1_1.c",
+  "Pressure (kPa)",
+  "Air Pressure",
+  "black"
+)
+```
+
+# Shortwave Radiation
+
+```{r}
+plot_met_long(
+  df_month,
+  c(
+    "SWIN_6_10_1_1_1.c",
+    "SWOUT_6_11_1_1_1.c"
+  ),
+  c(
+    "Incoming",
+    "Outgoing"
+  ),
+  c(
+    "orange",
+    "blue"
+  ),
+  expression(W~m^-2),
+  "Shortwave Radiation"
+)
+```
+
+# Longwave Radiation
+
+```{r}
+plot_met_long(
+  df_month,
+  c(
+    "LWIN_6_14_1_1_1.c",
+    "LWOUT_6_15_1_1_1.c"
+  ),
+  c(
+    "Incoming",
+    "Outgoing"
+  ),
+  c(
+    "red",
+    "blue"
+  ),
+  expression(W~m^-2),
+  "Longwave Radiation"
+)
+```
+
+# Net Radiation
+
+```{r}
+plot_met_single(
+  df_month,
+  "Rn",
+  expression(Net~Radiation~(W~m^-2)),
+  "Net Radiation"
+)
+```
+
+# PAR
+
+```{r}
+plot_met_long(
+  df_month,
+  c(
+    "PPFD_7_21_1_1_1.c",
+    "PPFDR_7_23_1_1_1.c"
+  ),
+  c(
+    "Incoming",
+    "Reflected"
+  ),
+  c(
+    "darkgreen",
+    "green"
+  ),
+  expression(mu*mol~m^-2~s^-1),
+  "PAR"
+)
+```
+
+# Albedo
+
+```{r}
+plot_met_single(
+  df_month,
+  "ALB_1_1_1.c",
+  "Albedo",
+  "Albedo",
+  "cyan4"
+)
+```
+
+# Soil Moisture
+
+```{r}
+plot_met_long(
+  df_month,
+  c(
+    "SWC_12_36_1_1_1.c",
+    "SWC_12_36_2_1_1.c",
+    "SWC_12_36_3_1_1.c"
+  ),
+  c(
+    "8 cm",
+    "18 cm",
+    "28 cm"
+  ),
+  c(
+    "blue",
+    "green",
+    "gold3"
+  ),
+  "Soil Moisture (%)",
+  "Soil Moisture"
+)
+```
+
+# Soil Temperature
+
+```{r}
+plot_met_long(
+  df_month,
+  c(
+    "TS_2_38_1_1_1.c",
+    "TS_2_38_2_1_1.c",
+    "TS_2_38_23_1_1.c"
+  ),
+  c(
+    "8 cm",
+    "18 cm",
+    "28 cm"
+  ),
+  c(
+    "blue",
+    "green",
+    "gold3"
+  ),
+  "Soil Temperature (°C)",
+  "Soil Temperature"
+)
+```
+
+# Soil Heat Flux
+
+```{r}
+plot_met_long(
+  df_month,
+  cols = c(
+    "G",
+    "SHF_6_37_1_1_1.c",
+    "SHF_6_37_2_1_1.c"
+  ),
+  labels = c(
+    "G",
+    "SHF 1",
+    "SHF 2"
+  ),
+  colors = c(
+    "black",
+    "blue",
+    "red"
+  ),
+  ylab = expression(Soil~Heat~Flux~(W~m^-2)),
+  title = "Soil Heat Flux"
+)
+```
+
+
+# Wind Rose
+
+```{r}
+df_wind <- df_month
+
+df_wind <- df_wind[
+  !is.na(df_wind$WD_20_35_1_1_1) &
+  !is.na(df_wind$WS_16_33_1_1_1),
+]
+
+names(df_wind)[names(df_wind) == "WD_20_35_1_1_1"] <- "wd"
+names(df_wind)[names(df_wind) == "WS_16_33_1_1_1"] <- "ws"
+
+windRose(
+  df_wind,
+  ws = "ws",
+  wd = "wd",
+  paddle = FALSE,
+  key = TRUE
+)
+```
+Create potential radiation dataset
+```{r,error = FALSE}
+
+
+mindate <- min(df$TIMESTAMP, na.rm = TRUE)
+maxdate <- max(df$TIMESTAMP, na.rm = TRUE)
+
+TIMESTAMP <- seq(
+  from = mindate,
+  to = maxdate,
+  by = "30 min"
+)
+
+JD <- as.numeric(format(TIMESTAMP, "%j"))
+h  <- as.numeric(format(TIMESTAMP, "%H"))
+m  <- as.numeric(format(TIMESTAMP, "%M"))
+
+H <- h + ifelse(m == 30, 0.5, 0)
+
+rpot_vals <- potential.radiation(doy = JD,hour = H,latDeg = 68.5272,longDeg = -149.5491,timezone = -9,useSolartime = T)*1.1
+
+rpot_df <- data.frame(
+  TIMESTAMP = TIMESTAMP,
+  rpot = as.numeric(rpot_vals)
+)
+
+df <- merge(
+  df,
+  rpot_df,
+  by = "TIMESTAMP",
+  all.x = TRUE
+)
+
+stopifnot("rpot" %in% names(df))
+
+```
+
+
+One to one plot for check
+```{r}
+
+df$radflag <- ifelse(df$SWIN_6_10_1_1_1 > df$rpot, 1, 0)
+```
+# Radiation Timing Check
+
+#POTENTIAL RADIATION VS SWIN - TIME ALIGNMENT CHECK
+#making monthly diel graphs
+
+
+```{r, warning=F, echo=FALSE}
+
+
+df$year  <- year(df$TIMESTAMP)
+df$month <- month(df$TIMESTAMP)
+df$hour  <- hour(df$TIMESTAMP)
+
+diel_rad <- df %>%
+  dplyr::group_by(year, month, hour) %>%
+  dplyr::summarise(
+    rad_mean  = mean(SWIN_6_10_1_1_1.c, na.rm = TRUE),
+    rad_sd    = sd(SWIN_6_10_1_1_1.c, na.rm = TRUE),
+    rpot_mean = mean(rpot, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+month_list <- diel_rad %>%
+  dplyr::distinct(year, month) %>%
+  dplyr::arrange(year, month)
+
+for(i in seq_len(nrow(month_list))) {
+
+  y <- month_list$year[i]
+  m <- month_list$month[i]
+
+  dfm <- diel_rad %>%
+    dplyr::filter(year == y, month == m)
+
+  p <- ggplot(dfm, aes(hour)) +
+    geom_ribbon(
+      aes(
+        ymin = rad_mean - rad_sd,
+        ymax = rad_mean + rad_sd
+      ),
+      alpha = 0.3
+    ) +
+    geom_line(aes(y = rad_mean), linetype = 2) +
+    geom_line(aes(y = rpot_mean), linewidth = 0.8) +
+    scale_x_continuous(breaks = seq(0, 23, 3)) +
+    labs(
+      title = paste(month.name[m], y),
+      x = "Hour",
+      y = expression(Radiation~(W~m^-2))
+    ) +
+    theme_minimal()
+
+  print(p)
+}
+
+```
+

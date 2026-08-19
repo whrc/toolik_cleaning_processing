@@ -14,7 +14,7 @@ rm(list = ls())
 Sys.setenv(TZ = "UTC")
 knitr::opts_chunk$set(error = TRUE)
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = 'C:/Users/klynoe/Documents/toolik/raw_data') #use this to set your directory
+knitr::opts_knit$set(root.dir = 'C:/Users/klynoe/Documents/toolik/R_outputs') #use this to set your directory
 
 library(data.table)
 library(ggplot2)
@@ -34,11 +34,11 @@ library(dplyr)
 
 ```{r, warning=FALSE}
 
-df = read.csv('C:/Users/klynoe/Documents/toolik/R_outputs/toolik_met_flux_merged_aligned_202603_04.csv')
+df = read.csv('C:/Users/klynoe/Documents/toolik/R_outputs/toolik_met_flux_merged_aligned_2025_2026.csv')
 
 
 df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
-df$ts <- as.POSIXct(df$ts, format = "%Y-%m-%d %H:%M", tz = "UTC")
+#df$ts <- as.POSIXct(df$ts, format = "%Y-%m-%d %H:%M", tz = "UTC")
 # Replace specific missing value indicators with NA
 df[df == -9999] <- NA
 df[df == -7999] <- NA
@@ -68,7 +68,7 @@ df = merge(tsdf,df,by = 'TIMESTAMP',all.x = T)
 ```
 
 ```{r, warning=FALSE}
-biomet_dates <- c('2026-03-01', '2026-05-01')
+biomet_dates <- c('2025-05-01', '2026-08-01')
 #biomet_dates <- c('2024-10-30', '2024-12-01')
 ```
 
@@ -129,8 +129,8 @@ RH.limits = df$RH_19_3_1_1_1
 
 df$RH.c = RH.limits
 
-#df$RH.c[ df$TIMESTAMP %between% as.POSIXct(
- # c("2025-12-03 09:30", "2025-12-12 12:00"), tz = "UTC")] = NA # HMP malfunction so just wiping this
+df$RH.c[ df$TIMESTAMP %between% as.POSIXct(
+ c("2025-12-03 09:30", "2025-12-12 12:00"), tz = "UTC")] = NA # HMP malfunction so just wiping this
 
 ggplot(data = df)+
   geom_point(aes(TIMESTAMP,RH.c),col='black')+
@@ -139,51 +139,87 @@ ggplot(data = df)+
   scale_x_datetime(limits = as.POSIXct(biomet_dates))
 ```
 
-# Barometric Pressure  - no pressure in met  - use sonic pressure if needed
 
-```{r,warning=FALSE}
-#ggplot(data = df)+
- # geom_point(aes(TIMESTAMP,air_pressure),col='black')+
-  #scale_y_continuous(#limits = c(90000,110000),
-   #                  expression ('Barometric Pressure ('*kPa*')'))
-#  scale_x_datetime(limits = as.POSIXct(biomet_dates))
-
-#df$air_pressure = ifelse(df$air_pressure > 97000,df$air_pressure/1000,df$air_pressure)
-#df$air_pressure = ifelse(df$air_pressure > 87000, df$air_pressure / 1000, df$air_pressure)
-
-#ggplot(data = df)+
- # geom_point(aes(TIMESTAMP,air_pressure),col='black')+
-#  scale_y_continuous(limits = c(0,200),
- #                    expression ('Barometric Pressure ('*kPa*')'))
-
-
-#df$air_pressure = ifelse(df$air_pressure > 150,df$air_pressure/10,df$air_pressure)
-
-#ggplot(data = df)+
- # geom_point(aes(TIMESTAMP,air_pressure),col='black')+
-#  scale_y_continuous(limits = c(80,110),
- #                    expression ('Barometric Pressure ('*kPa*')'))
-```
-
-
+# Barometric Pressure 
 ```{r, warning=FALSE}
-#hist(df$air_pressure,breaks=100)
 
-#ggplot(data = df)+
- # geom_point(aes(TIMESTAMP,air_pressure),col='black')+
-#  scale_y_continuous(limits = c(90,110),
- #                    expression ('Barometric Pressure ('*kPa*')'))
+cutoff_date <- as.POSIXct("2026-05-01 00:00:00", tz = "UTC")
+lbl_y <- expression('Barometric Pressure ('*kPa*')')
 
-#air_pressure.limits = ifelse(df$air_pressure > 110 | df$air_pressure < 97,NA, df$air_pressure)
+# --- SAFEGUARD: Back up original columns on first run to allow infinite reruns ---
+if (!exists("air_p_mean_backup", envir = .GlobalEnv)) air_p_mean_backup <<- df$air_p_mean
+if (!exists("PA_4_2_1_1_1_backup", envir = .GlobalEnv)) PA_4_2_1_1_1_backup <<- df$PA_4_2_1_1_1
 
-#ggplot(data = df)+
- # geom_point(aes(TIMESTAMP,air_pressure.limits),col='black')+
-#  geom_hline(yintercept = 106,col = 'red')+
- # geom_hline(yintercept = 97,col = 'red')+
-#  scale_y_continuous(limits = c(90,110),
- #                    expression ('Barometric Pressure ('*kPa*')'))
+# Always reset active columns to raw data at the start of execution
+df$air_p_mean   <- air_p_mean_backup
+df$PA_4_2_1_1_1 <- PA_4_2_1_1_1_backup
+
+# =========================================================================
+# 1. CLEANING & PLOTTING: air_p_mean
+# =========================================================================
+#
+ggplot(df) + geom_point(aes(TIMESTAMP, air_p_mean)) + scale_y_continuous(name = lbl_y) + scale_x_datetime(limits = as.POSIXct(biomet_dates))
+
+# Unit conversion step
+df$air_p_mean <- ifelse(df$air_p_mean > 97000, df$air_p_mean / 1000, df$air_p_mean)
+df$air_p_mean <- ifelse(df$air_p_mean > 87000, df$air_p_mean / 1000, df$air_p_mean)
+
+# Plot 2: Scaled view
+ggplot(df) + geom_point(aes(TIMESTAMP, air_p_mean)) + scale_y_continuous(limits = c(0, 200), name = lbl_y)
+
+# Tenfold correction step
+df$air_p_mean <- ifelse(df$air_p_mean > 150, df$air_p_mean / 10, df$air_p_mean)
+
+# 
+ggplot(df) + geom_point(aes(TIMESTAMP, air_p_mean)) + scale_y_continuous(limits = c(86, 94), name = lbl_y)
+hist(df$air_p_mean, breaks = 10)
+ggplot(df) + geom_point(aes(TIMESTAMP, air_p_mean)) + scale_y_continuous(limits = c(85, 100), name = lbl_y)
+
+# Boundaries filter
+air_p_mean.limits <- ifelse(df$air_p_mean > 110 | df$air_p_mean < 85, NA, df$air_p_mean)
+df$air_p_mean.c      <- air_p_mean.limits
+
+# Plot 6: Cleaned with limits
+ggplot(df) + geom_point(aes(TIMESTAMP, air_p_mean.limits)) + geom_hline(yintercept = c(87, 96), col = 'red') + scale_y_continuous(limits = c(85, 100), name = lbl_y)
+
+
+# =========================================================================
+# 2. CLEANING & PLOTTING: PA_4_2_1_1_1
+# =========================================================================
+# 
+ggplot(df) + geom_point(aes(TIMESTAMP, PA_4_2_1_1_1)) + scale_y_continuous(name = lbl_y)
+
+# Unit conversion step
+df$PA_4_2_1_1_1 <- ifelse(df$PA_4_2_1_1_1 > 97000, df$PA_4_2_1_1_1 / 1000, df$PA_4_2_1_1_1)
+
+# Plot 8: Scaled view
+ggplot(df) + geom_point(aes(TIMESTAMP, PA_4_2_1_1_1)) + scale_y_continuous(limits = c(0, 1100), name = lbl_y)
+
+# Tenfold correction step
+df$PA_4_2_1_1_1 <- ifelse(df$PA_4_2_1_1_1 > 150, df$PA_4_2_1_1_1 / 10, df$PA_4_2_1_1_1)
+
+# 
+ggplot(df) + geom_point(aes(TIMESTAMP, PA_4_2_1_1_1)) + scale_y_continuous(limits = c(0, 140), name = lbl_y)
+hist(df$PA_4_2_1_1_1, breaks = 100)
+ggplot(df) + geom_point(aes(TIMESTAMP, PA_4_2_1_1_1)) + scale_y_continuous(limits = c(85, 110), name = lbl_y)
+
+# Boundaries filter
+PA_4_2_1_1_1.limits <- ifelse(df$PA_4_2_1_1_1 > 110 | df$PA_4_2_1_1_1 < 85, NA, df$PA_4_2_1_1_1)
+df$PA_4_2_1_1_1.c      <- PA_4_2_1_1_1.limits
+
+# Plot 12: Cleaned with limits
+ggplot(df) + geom_point(aes(TIMESTAMP, PA_4_2_1_1_1.limits)) + geom_hline(yintercept = c(86, 106), col = 'red') + scale_y_continuous(limits = c(85, 110), name = lbl_y)
+
+
+# =========================================================================
+# 3. MERGE TIMELINES CHRONOLOGICALLY
+# =========================================================================
+combined_pressure <- ifelse(df$TIMESTAMP < cutoff_date, df$air_p_mean.c, df$PA_4_2_1_1_1.c)
+
+# Plot 13: Final master dataset visualization
+ggplot(df) + geom_point(aes(TIMESTAMP, combined_pressure), alpha = 0.5) + geom_vline(xintercept = cutoff_date, col = 'blue', linetype = 'dashed') + scale_y_continuous(limits = c(85, 97), name = lbl_y) + labs(title = "All Pressure")
+
 ```
-
 
 #Soil Heat Flux
 ```{r, warning=FALSE}
@@ -201,13 +237,14 @@ ggplot(data = df)+
 ```{r, warning=FALSE}
 # -------------------------------
 # -------------------------------
-cutoff_time = as.POSIXct("2025-07-01 11:30", tz = "UTC")  
+#cutoff_time = as.POSIXct("2025-07-01 11:30", tz = "UTC")  
 
 df$SHF_6_37_1_1_1.c <- df$SHF_6_37_1_1_1
 # Set to NA if outside limits OR before cutoff
 df$SHF_6_37_1_1_1.c[df$SHF_6_37_1_1_1 < -55 | 
-                     df$SHF_6_37_1_1_1 > 190 | 
-                     df$TIMESTAMP < cutoff_time] = NA
+                     df$SHF_6_37_1_1_1 > 190 ]= NA
+                    #df$TIMESTAMP < cutoff_time] 
+                    
 
 # -------------------------------
 # 2. Optional: check with histogram and plot
@@ -216,7 +253,7 @@ hist(df$SHF_6_37_1_1_1.c, breaks = 100)
 plot(df$TIMESTAMP, df$SHF_6_37_1_1_1.c, type = "l", ylim = c(-50, 200))
 abline(h = -55, col = "red")
 abline(h = 190, col = "red")
-abline(v = cutoff_time, col = "blue", lty = 2)  # show cutoff
+#abline(v = cutoff_time, col = "blue", lty = 2)  # show cutoff
 
 
 
@@ -228,15 +265,15 @@ abline(v = cutoff_time, col = "blue", lty = 2)  # show cutoff
 # SHF 2: limits + cutoff time
 # -------------------------------
 
-cutoff_time <- as.POSIXct("2025-07-01 11:30", tz = "UTC")
+#cutoff_time <- as.POSIXct("2025-07-01 11:30", tz = "UTC")
 
 df$SHF_6_37_2_1_1.c <- df$SHF_6_37_2_1_1
 
 df$SHF_6_37_2_1_1.c[
   df$SHF_6_37_2_1_1 < -75 |
-  df$SHF_6_37_2_1_1 > 150 |
-  df$TIMESTAMP < cutoff_time
-] <- NA
+  df$SHF_6_37_2_1_1 > 150 
+  #df$TIMESTAMP < cutoff_time
+] = NA
 
 
 hist(df$SHF_6_37_2_1_1.c, breaks = 100)
@@ -244,7 +281,7 @@ hist(df$SHF_6_37_2_1_1.c, breaks = 100)
 plot(df$TIMESTAMP, df$SHF_6_37_2_1_1.c, type = "l", ylim = c(-80, 165))
 abline(h = -75, col = "red")
 abline(h = 150, col = "red")
-abline(v = cutoff_time, col = "blue", lty = 2)
+#abline(v = cutoff_time, col = "blue", lty = 2)
 
 ```
 ##SHF
@@ -508,7 +545,7 @@ ggplot(data = df)+ theme_bw()+ geom_hline(yintercept = 0)+
   scale_y_continuous(limits = c(-8,15),
                      expression('Therms Soil T ('*C*')'))
 
-#df$TS_2_38_1_1_1[df$TIMESTAMP == as.POSIXct("2025-12-03 10:00:00")] <- NA # take out bad reading
+df$TS_2_38_1_1_1[df$TIMESTAMP == as.POSIXct("2025-12-03 10:00:00")] <- NA # take out bad reading
   
 TS_2_38_1_1_1.limits = df$TS_2_38_1_1_1
 
@@ -531,7 +568,7 @@ ggplot(data = df)+ theme_bw()+ geom_hline(yintercept = 0)+
   geom_line(aes(TIMESTAMP, TS_2_38_2_1_1, col = '18 cm'))+
   scale_x_datetime(limits = as.POSIXct(biomet_dates))
 
-#df$TS_2_38_2_1_1[df$TIMESTAMP == as.POSIXct("2025-12-03 10:00:00")] <- NA # take out bad reading
+df$TS_2_38_2_1_1[df$TIMESTAMP == as.POSIXct("2025-12-03 10:00:00")] <- NA # take out bad reading
 
 TS_2_38_2_1_1.limits = df$TS_2_38_2_1_1
 
@@ -549,22 +586,29 @@ plot(df$TS_2_38_2_1_1.c)
 
 ```{r, warning=FALSE}
 
+cutoff_date <- as.POSIXct("2026-05-01 00:00:00", tz = "UTC")
+
+# Overwrite the final column with merged historical data - sensor name change.
+df$TS_2_38_2_2_1 <- ifelse(df$TIMESTAMP <= cutoff_date, 
+                           df$TS_2_38_23_1_1, 
+                           df$TS_2_38_2_2_1)
+
 ggplot(data = df)+ theme_bw()+ geom_hline(yintercept = 0)+
-  geom_line(aes(TIMESTAMP, TS_2_38_23_1_1, col = '28 cm'))+
+  geom_line(aes(TIMESTAMP, TS_2_38_2_2_1, col = '28 cm'))+
   scale_x_datetime(limits = as.POSIXct(biomet_dates))
 
-#df$TS_2_38_23_1_1[df$TIMESTAMP == as.POSIXct("2025-12-03 10:00:00")] <- NA # take out bad reading
+df$TS_2_38_23_1_1[df$TIMESTAMP == as.POSIXct("2025-12-03 10:00:00")] <- NA # take out bad reading
 
-TS_2_38_23_1_1.limits = df$TS_2_38_23_1_1
+TS_2_38_2_2_1.limits = df$TS_2_38_2_2_1
 
-df$TS_2_38_23_1_1.c = TS_2_38_23_1_1.limits
+df$TS_2_38_2_2_1.c = TS_2_38_2_2_1.limits
 
 ggplot(data = df)+ theme_bw()+ geom_hline(yintercept = 0)+
-  geom_line(aes(TIMESTAMP, TS_2_38_23_1_1.c, col = '28 cm'))
+  geom_line(aes(TIMESTAMP, TS_2_38_2_2_1.c, col = '28 cm'))
 #+
  # scale_x_datetime(limits = as.POSIXct(c("2024-07-25",'2024-12-01')))
 
-plot(df$TS_2_38_23_1_1.c)
+plot(df$TS_2_38_2_2_1.c)
 ```
 
 
@@ -574,7 +618,7 @@ ggplot(data = df)+ theme_bw()+
   geom_hline(yintercept = 0)+
   geom_line(aes(TIMESTAMP,TS_2_38_1_1_1.c,color='8 cm'))+
   geom_line(aes(TIMESTAMP,TS_2_38_2_1_1.c,color='18 cm'))+
-  geom_line(aes(TIMESTAMP,TS_2_38_23_1_1.c,color='28 cm'))
+  geom_line(aes(TIMESTAMP,TS_2_38_2_2_1.c,color='28 cm'))
   
  # scale_x_datetime(biomet_dates)
 ```
@@ -582,10 +626,15 @@ ggplot(data = df)+ theme_bw()+
 
 # Volumetric Water Content
 ```{r, warning=FALSE}
+
+df$SWC_12_36_2_2_1 <- ifelse(df$TIMESTAMP <= cutoff_date, 
+                           df$SWC_12_36_3_1_1, 
+                           df$SWC_12_36_2_2_1)
+
 ggplot(data = df)+
-  geom_point(aes(TIMESTAMP, SWC_12_36_1_1_1*100,col='SWC 8cm'))+
+  geom_point(aes(TIMESTAMP, SWC_12_36_1_1_1*100,col='SWC 08cm'))+
   geom_point(aes(TIMESTAMP, SWC_12_36_2_1_1*100,col='SWC 18cm'))+
-  geom_point(aes(TIMESTAMP, SWC_12_36_3_1_1*100,col='SWC 28cm'))+
+  geom_point(aes(TIMESTAMP, SWC_12_36_2_2_1*100,col='SWC 28cm'))+
   scale_y_continuous(limits = c(0,100),
                      expression('% VWC'))+
   scale_x_datetime(limits = as.POSIXct(biomet_dates))
@@ -596,12 +645,12 @@ df$SWC_12_36_3_1_1[df$TIMESTAMP == as.POSIXct("2025-12-03 10:00:00")] <- NA # ta
 
 df$SWC_12_36_1_1_1.c = df$SWC_12_36_1_1_1
 df$SWC_12_36_2_1_1.c = df$SWC_12_36_2_1_1
-df$SWC_12_36_3_1_1.c = df$SWC_12_36_3_1_1
+df$SWC_12_36_2_2_1.c = df$SWC_12_36_2_2_1
 
 ggplot(data = df)+
-  geom_point(aes(TIMESTAMP, SWC_12_36_1_1_1*100,col='SWC 8cm'))+
+  geom_point(aes(TIMESTAMP, SWC_12_36_1_1_1*100,col='SWC 08cm'))+
   geom_point(aes(TIMESTAMP, SWC_12_36_2_1_1*100,col='SWC 18cm'))+
-  geom_point(aes(TIMESTAMP, SWC_12_36_3_1_1*100,col='SWC 28cm'))+
+  geom_point(aes(TIMESTAMP, SWC_12_36_2_2_1*100,col='SWC 28cm'))+
   scale_y_continuous(limits = c(0,100),
                      expression('% VWC'))+
   scale_x_datetime(limits = as.POSIXct(biomet_dates))
@@ -611,8 +660,10 @@ ggplot(data = df)+
 
 ```{r, warning=FALSE}
 df <- df[!duplicated(df$TIMESTAMP), ]
+
 df$TIMESTAMP <- format(as.POSIXct(df$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202603_04.csv',row.names = F,quote = T)
+df$ts = format(as.POSIXct(df$ts), format ="%Y-%m-%d %H:%M")
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_tms_c_2025_2026.csv',row.names = F,quote = T)
 
 ```
 

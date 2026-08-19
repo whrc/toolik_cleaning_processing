@@ -20,10 +20,7 @@ na_strings <- c("-9999","NA","NaN","NAN","-7999")
 
 files <- c(
   "toolik-gth89-AllLogger.dat",
-  "toolik-gth89-AllLogger_until20251027.dat",
-  "toolik-gth89-AllLogger_until20251203.dat",
-  "toolik-gth89-AllLogger_until20251209.dat",
-  "toolik-gth89-AllLogger_until20251212.dat"
+  "toolik-gth89-AllLogger_until20260727.dat"
 )
 
 # read header once (authoritative column set)
@@ -53,7 +50,7 @@ df <- unique(df)
 df = df[!duplicated(df$TIMESTAMP),]
 
 
-timestamp_cutoff <- as.POSIXct("2025-05-01 14:00", format = "%Y-%m-%d %H:%M", tz = "UTC")
+timestamp_cutoff <- as.POSIXct("2026-01-01 14:00", format = "%Y-%m-%d %H:%M", tz = "UTC")
 df <- df %>%
   dplyr::filter(TIMESTAMP >= timestamp_cutoff)
 
@@ -111,10 +108,7 @@ na_strings <- c("-9999","NA","NaN","NAN","-7999")
 
 files <- c(
   "toolik-gth89-AllBiomet.dat",
-  "toolik-gth89-AllBiomet_until20251027.dat",
-  "toolik-gth89-AllBiomet_until20251203.dat",
-  "toolik-gth89-AllBiomet_until20251209.dat",
-  "toolik-gth89-AllBiomet_until20251212.dat"
+  "toolik-gth89-AllBiomet_until20260727.dat"
 )
 
 # read header once (authoritative column set)
@@ -142,7 +136,7 @@ df <- unique(df)
 df = df[!duplicated(df$TIMESTAMP),]
 
 
-timestamp_cutoff <- as.POSIXct("2025-05-01 14:00", format = "%Y-%m-%d %H:%M", tz = "UTC")
+timestamp_cutoff <- as.POSIXct("2026-04-30 23:59", format = "%Y-%m-%d %H:%M", tz = "UTC")
 df <- df %>%
   dplyr::filter(TIMESTAMP >= timestamp_cutoff)
 
@@ -206,7 +200,7 @@ met$TIMESTAMP <- format(
 #2# add units
 
 units <- c(
-  "yyyy-mm-dd HH:MM",  # TIMESTAMP etc
+  "yyyy-mm-dd HH:MM",  # TIMESTAMP etc - NEEDS ADJUSTMENT FROM 26/04/2026 
   "degC",
   "%",
   "m/s",
