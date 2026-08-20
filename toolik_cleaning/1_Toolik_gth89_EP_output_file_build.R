@@ -64,6 +64,177 @@ df = merge(ts,df,by = 'ts',all.x = T)
 write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202607.csv',row.names = F)
 
 
+################multiple met
+
+
+
+# 1. Define folder path and list all AllBiomet files
+fp <- "C:/Users/klynoe/Documents/toolik/raw_data/met/annual_met/"
+files <- list.files(path = fp, pattern = "toolik-gth89-AllBiomet_.+\\.dat$", recursive = TRUE, full.names = TRUE)
+
+# 2. Bulk load headers and data matching your specific Toolik format
+h_list <- lapply(files, fread, skip = 1, nrows = 0)
+dat_list <- lapply(files, fread, skip = 4, header = FALSE, 
+                   na.strings = c('-9999','NA','NaN','NAN','-7999'))
+
+# 3. Dynamically map headers to their respective datasets
+for (i in seq_along(dat_list)) {
+  names(dat_list[[i]]) <- names(h_list[[i]])
+}
+
+# 4. Ultra-fast bind matching by column names (fill = TRUE handles new columns)
+df_master <- rbindlist(dat_list, use.names = TRUE, fill = TRUE)
+
+# 5. Clean up timestamps and drop duplicate rows
+df_master$TIMESTAMP <- as.POSIXct(df_master$TIMESTAMP, tz = "UTC")
+df_master <- unique(df_master, by = "TIMESTAMP")
+
+# 6. Generate a continuous 30-minute time grid starting from your specific date
+start_date <- as.POSIXct("2025-05-06 09:30:00", tz = "UTC")
+stop_date = as.POSIXct("2026-07-23 18:00:00", tz = "UTC")
+ts_grid <- data.frame(TIMESTAMP = seq(
+  from = start_date,
+  to = stop_date,
+  by = 60 * 30
+))
+
+# 7. Merge onto grid to reveal NAs where records are missing
+df_master <- merge(ts_grid, df_master, by = "TIMESTAMP", all.x = TRUE)
+###########################
+
+write.csv(df_master,'C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik_met_202505_202607.csv',row.names = F)
+###########
+
+###MERGE FLUX AND MET!!!!!!##########
+
+df$TIMESTAMP = df$ts
+
+flux = df
+met = df_master
+
+# 1. Ensure both master files are formatted as data.tables
+setDT(met)
+setDT(flux)
+
+# 2. Force both TIMESTAMP columns to be identical in format and timezone
+met$TIMESTAMP <- as.POSIXct(met$TIMESTAMP, tz = "UTC")
+flux$TIMESTAMP <- as.POSIXct(flux$TIMESTAMP, tz = "UTC")
+
+# 3. Combine them using a full outer join to prevent any data loss
+DF_1 <- merge(met, flux, by = "TIMESTAMP", all = TRUE)
+
+
+###############
+##ADD TOMST - REFORMAT AND MERGE
+
+tomst = read.csv("C:/Users/klynoe/Documents/toolik/R_outputs/TOMST_combined_20260728.csv", header = T)
+
+
+# Create variable names
+tomst_wide <- tomst %>%
+  mutate(
+    logger = recode(Logger,
+                    "center" = "C",
+                    "east"   = "E",
+                    "west"   = "W",
+                    "north"  = "N",
+                    "south"  = "S"
+    ),
+    temp_var = case_when(
+      Depth == "+15cm" ~ paste0("TMS_", logger, "_T_1"),
+      Depth == "0cm"   ~ paste0("TMS_", logger, "_T_2"),
+      Depth == "-10cm" ~ paste0("TMS_", logger, "_T_3")
+    ),
+    vwc_var = if_else(
+      Depth == "-10cm",
+      paste0("TMS_", logger, "_VWC"),
+      NA_character_
+    )
+  ) %>%
+  
+  # Put Temperature and VWC into one long column of variable names
+  pivot_longer(
+    cols = c(Temperature, VWC),
+    names_to = "Type",
+    values_to = "Value"
+  ) %>%
+  mutate(
+    Variable = case_when(
+      Type == "Temperature" ~ temp_var,
+      Type == "VWC" ~ vwc_var
+    )
+  ) %>%
+  filter(!is.na(Variable)) %>%
+  select(TIMESTAMP, Variable, Value) %>%
+  pivot_wider(
+    names_from = Variable,
+    values_from = Value
+  )
+
+tomst_wide <- tomst_wide %>%
+  select(
+    TIMESTAMP,
+    TMS_C_T_1, TMS_C_T_2, TMS_C_T_3, TMS_C_VWC,
+    TMS_E_T_1, TMS_E_T_2, TMS_E_T_3, TMS_E_VWC,
+    TMS_W_T_1, TMS_W_T_2, TMS_W_T_3, TMS_W_VWC,
+    TMS_N_T_1, TMS_N_T_2, TMS_N_T_3, TMS_N_VWC,
+    TMS_S_T_1, TMS_S_T_2, TMS_S_T_3, TMS_S_VWC
+  )
+# 3. Clean timestamps—handles hourly formats (e.g., "2025-08-04 10:00") cleanly
+tomst_wide$TIMESTAMP <- as.POSIXct(tomst_wide$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
+
+setDT(DF_1)
+setDT(tomst_wide)
+#
+
+flux_biomet_tms <- merge(DF_1, tomst_wide, by = "TIMESTAMP", all = TRUE)
+
+
+# 1. Ensure it is a data.table
+setDT(flux_biomet_tms)
+
+# 2. Get names of columns to process (skipping TIMESTAMP)
+clean_cols <- setdiff(names(flux_biomet_tms), "TIMESTAMP")
+
+# 3. Fast clean loop across all columns
+for (col in clean_cols) {
+  # Fix standard bad values
+  set(flux_biomet_tms, i = which(flux_biomet_tms[[col]] == -9999), j = col, value = NA)
+  set(flux_biomet_tms, i = which(flux_biomet_tms[[col]] == -7999), j = col, value = NA)
+  
+  # Catch hidden NaNs or Infinite spikes in numeric columns
+  if (is.numeric(flux_biomet_tms[[col]])) {
+    set(flux_biomet_tms, i = which(is.nan(flux_biomet_tms[[col]])), j = col, value = NA)
+    set(flux_biomet_tms, i = which(is.infinite(flux_biomet_tms[[col]])), j = col, value = NA)
+  }
+}
+
+flux_biomet_tms$TIMESTAMP = flux_biomet_tms$ts
+############
+##SAVE!!!###
+flux_biomet_tms$ts <- format(as.POSIXct(flux_biomet_tms$ts), format ="%Y-%m-%d %H:%M:%S" )
+flux_biomet_tms$TIMESTAMP <- format(as.POSIXct(flux_biomet_tms$TIMESTAMP), format ="%Y-%m-%d %H:%M:%S" )
+write.csv(
+  flux_biomet_tms,
+  "C:/Users/klynoe/Documents/toolik/R_outputs/GTH89_flux_biomet_tms_combined_2025_2026.csv"
+  , row.names = F)
+
+################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ################
 ####SINGLE FILE EDDYPRO PREPARATION####
 ####################################
@@ -143,35 +314,36 @@ write.csv(
 
 ###############
 
-df = fread(input = "C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat", header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
-#h = fread("C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat",skip=1, nrows = 0 , na.strings = c('-9999','NA','NaN','NAN','-7999'))
-df= fread(input ="C:/Users/klynoe/Documents/toolik/raw_data/met/toolik-gth89-AllBiomet.dat", skip = 1, header = F , na.strings = c('-9999','NA','NaN','NAN','-7999'))
-df= df[-3,]
 
 
-#df = rbind.fill(df,met)
-df = df[!duplicated(df$TIMESTAMP),]
 
 
-df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, tz = "UTC")
-
-timestamp_cutoff <- as.POSIXct("2026-04-30 14:00", format = "%Y-%m-%d %H:%M", tz = "UTC")
-df <- df %>%
-  dplyr::filter(TIMESTAMP >= timestamp_cutoff)
 
 
-# Create a complete sequence of timestamps at 30-minute intervals
-tsdf <- data.frame(TIMESTAMP = seq(
-  from = min(df$TIMESTAMP),
-  to = max(df$TIMESTAMP),
-  by = 60*30
-))
 
 
-df = merge(tsdf,df,by = 'TIMESTAMP',all.x = T)
 
 
-write.csv(df, "C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik-gth89-AllBiomet2606.csv", row.names = F)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#write.csv(df, "C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik-gth89-AllBiomet2606.csv", row.names = F)
 
 
 
@@ -225,77 +397,6 @@ biomet$TIMESTAMP = biomet$ts
 flux_biomet = merge(biomet, df, by = "ts")
 ###########################################################
 
-###############
-##ADD TOMST - REFORMAT AND MERGE
-
-tomst = read.csv("C:/Users/klynoe/Documents/toolik/R_outputs/TOMST_combined_20260728.csv", header = T)
 
 
-# Create variable names
-tomst_wide <- tomst %>%
-  mutate(
-    logger = recode(Logger,
-                    "center" = "C",
-                    "east"   = "E",
-                    "west"   = "W",
-                    "north"  = "N",
-                    "south"  = "S"
-    ),
-    temp_var = case_when(
-      Depth == "+15cm" ~ paste0("TMS_", logger, "_T_1"),
-      Depth == "0cm"   ~ paste0("TMS_", logger, "_T_2"),
-      Depth == "-10cm" ~ paste0("TMS_", logger, "_T_3")
-    ),
-    vwc_var = if_else(
-      Depth == "-10cm",
-      paste0("TMS_", logger, "_VWC"),
-      NA_character_
-    )
-  ) %>%
-  
-  # Put Temperature and VWC into one long column of variable names
-  pivot_longer(
-    cols = c(Temperature, VWC),
-    names_to = "Type",
-    values_to = "Value"
-  ) %>%
-  mutate(
-    Variable = case_when(
-      Type == "Temperature" ~ temp_var,
-      Type == "VWC" ~ vwc_var
-    )
-  ) %>%
-  filter(!is.na(Variable)) %>%
-  select(TIMESTAMP, Variable, Value) %>%
-  pivot_wider(
-    names_from = Variable,
-    values_from = Value
-  )
-
-tomst_wide <- tomst_wide %>%
-  select(
-    TIMESTAMP,
-    TMS_C_T_1, TMS_C_T_2, TMS_C_T_3, TMS_C_VWC,
-    TMS_E_T_1, TMS_E_T_2, TMS_E_T_3, TMS_E_VWC,
-    TMS_W_T_1, TMS_W_T_2, TMS_W_T_3, TMS_W_VWC,
-    TMS_N_T_1, TMS_N_T_2, TMS_N_T_3, TMS_N_VWC,
-    TMS_S_T_1, TMS_S_T_2, TMS_S_T_3, TMS_S_VWC
-  )
-
-tomst_wide$TIMESTAMP <- as.POSIXct(tomst_wide$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
-
-tomst_wide$ts = tomst_wide$TIMESTAMP
-
-tomst_wide =  merge(ts,tomst_wide,by = 'ts', all.x = T)
-
-flux_biomet_tms = merge(flux_biomet, tomst_wide, by = c("ts", "TIMESTAMP"), all.x = T)
-
-############
-##SAVE!!!###
-flux_biomet_tms$ts <- format(as.POSIXct(flux_biomet_tms$ts), format ="%Y-%m-%d %H:%M:%S" )
-flux_biomet_tms$TIMESTAMP <- format(as.POSIXct(flux_biomet_tms$TIMESTAMP), format ="%Y-%m-%d %H:%M:%S" )
-write.csv(
-  flux_biomet_tms,
-  "C:/Users/klynoe/Documents/toolik/R_outputs/GTH89_flux_biomet_tms_combined_2025_2026.csv"
-  , row.names = F)
 

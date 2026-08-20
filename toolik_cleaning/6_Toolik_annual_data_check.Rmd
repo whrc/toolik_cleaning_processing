@@ -862,81 +862,110 @@ print(p_sw)
 
 ```{r, warning=FALSE}
 
-# =========================================================================
-# 1. Calculate Rolling Averages per Column Before Pivoting
-# =========================================================================
+#### =========================================================================
+
+### 1. Extract year and calculate rolling averages per column before pivoting
+
+### =========================================================================
+
 df_par_smooth <- df %>%
-  arrange(TIMESTAMP) %>%
-  mutate(year = as.numeric(format(TIMESTAMP, "%Y"))) %>%
-  group_by(year) %>%
-  mutate(
-    # width = 48 corresponds to a 24-hour window if data is 30-minute intervals
-    # partial = FALSE ensures gaps are preserved with NAs instead of bleeding through
-    PAR_IN_smooth  = zoo::rollapply(PPFD_7_21_1_1_1.c, width = 48, FUN = mean, na.rm = TRUE, fill = NA, partial = FALSE),
-    PAR_OUT_smooth = zoo::rollapply(PPFDR_7_23_1_1_1.c, width = 48, FUN = mean, na.rm = TRUE, fill = NA, partial = FALSE)
-  ) %>%
-  ungroup()
+arrange(TIMESTAMP) %>%
+mutate(year = as.numeric(format(TIMESTAMP, "%Y"))) %>%
+group_by(year) %>%
+mutate(
 
-# Common y-axis expression string
-lbl_y_par <- expression(PAR~"(µmol m"^-2~" s"^-1*")")
+### width = 48 corresponds to a 24-hour window if data is 30-minute intervals
 
-# =========================================================================
-# 2. Generate Individual Validated Plots
-# =========================================================================
+### partial = FALSE ensures gaps are preserved with NAs instead of bleeding through
 
-# --- Incoming PAR Plot ---
-p_par_IN <- ggplot(df_par_smooth, aes(x = TIMESTAMP)) +
-  theme_minimal() +
-  # Raw data lines (slightly transparent)
-  geom_line(aes(y = PPFD_7_21_1_1_1.c), alpha = 0.4, color = "forestgreen", size = 0.6) +
-  # Smooth lines that automatically cut off during data gaps (na.rm = FALSE)
-  geom_line(aes(y = PAR_IN_smooth), color = "black", linewidth = 0.8, na.rm = FALSE) +
-  scale_y_continuous(
-    name = lbl_y_par,
-    expand = expansion(mult = 0.05)
-  ) +
-  scale_x_datetime(
-    date_breaks = "1 month",
-    date_labels = "%b %Y" # Tracks year changes explicitly
-  ) +
-  labs(
-    x = "",
-    title = "PAR — In"
-  ) +
-  theme(
-    axis.title.y = element_text(color = "black"),
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  )
+PAR_IN_smooth  = zoo::rollapply(PPFD_7_21_1_1_1.c, width = 48, FUN = mean, na.rm = TRUE, fill = NA, partial = FALSE),
+PAR_OUT_smooth = zoo::rollapply(PPFDR_7_23_1_1_1.c, width = 48, FUN = mean, na.rm = TRUE, fill = NA, partial = FALSE)
+) %>%
+ungroup() %>%
+select(TIMESTAMP, PPFD_7_21_1_1_1.c, PPFDR_7_23_1_1_1.c, PAR_IN_smooth, PAR_OUT_smooth)
+### =========================================================================
 
-# --- Outgoing PAR Plot ---
-p_par_OUT <- ggplot(df_par_smooth, aes(x = TIMESTAMP)) +
-  theme_minimal() +
-  # Raw data lines (slightly transparent)
-  geom_line(aes(y = PPFDR_7_23_1_1_1.c), alpha = 0.4, color = "forestgreen", size = 0.6) +
-  # Smooth lines that automatically cut off during data gaps (na.rm = FALSE)
-  geom_line(aes(y = PAR_OUT_smooth), color = "black", linewidth = 0.8, na.rm = FALSE) +
-  scale_y_continuous(
-    name = lbl_y_par,
-    expand = expansion(mult = 0.05)
-  ) +
-  scale_x_datetime(
-    date_breaks = "1 month",
-    date_labels = "%b %Y" # Tracks year changes explicitly
-  ) +
-  labs(
-    x = "",
-    title = "PAR — Out"
-  ) +
-  theme(
-    axis.title.y = element_text(color = "black"),
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  )
+### 2. Pivot the raw data
 
-# =========================================================================
-# 3. Display Stacked Plots
-# =========================================================================
-p_par_IN / p_par_OUT
+### =========================================================================
 
+df_raw_long_par <- df_par_smooth %>%
+select(TIMESTAMP, PPFD_7_21_1_1_1.c, PPFDR_7_23_1_1_1.c) %>%
+pivot_longer(
+cols = c(PPFD_7_21_1_1_1.c, PPFDR_7_23_1_1_1.c),
+names_to = "variable",
+values_to = "value"
+)
+
+### =========================================================================
+
+### 3. Pivot the smoothed data separately so they can be merged cleanly
+
+### =========================================================================
+
+df_smooth_long_par <- df_par_smooth %>%
+select(TIMESTAMP, PAR_IN_smooth, PAR_OUT_smooth) %>%
+pivot_longer(
+cols = c(PAR_IN_smooth, PAR_OUT_smooth),
+names_to = "variable",
+values_to = "smoothed_value"
+) %>%
+
+### Rename variables to match the raw data for seamless coloring
+
+mutate(variable = case_when(
+variable == "PAR_IN_smooth"  ~ "PPFD_7_21_1_1_1.c",
+variable == "PAR_OUT_smooth" ~ "PPFDR_7_23_1_1_1.c"
+))
+
+### =========================================================================
+
+### 4. Join the long dataframes together
+
+### =========================================================================
+
+df_par_final <- left_join(df_raw_long_par, df_smooth_long_par, by = c("TIMESTAMP", "variable"))
+
+### =========================================================================
+
+### 5. Plot using geom_line with na.rm = FALSE to force breaks at data gaps
+
+### =========================================================================
+
+p_par <- ggplot(df_par_final, aes(x = TIMESTAMP, color = variable)) +
+theme_minimal() +
+geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+
+### Raw data lines (slightly transparent)
+
+geom_line(aes(y = value), linewidth = 0.8, alpha = 0.3) +
+
+### Smooth lines that automatically cut off during data gaps
+
+geom_line(aes(y = smoothed_value), linewidth = 1, na.rm = FALSE) +
+scale_color_manual(
+values = c("PPFD_7_21_1_1_1.c" = "forestgreen", "PPFDR_7_23_1_1_1.c" = "darkorange2"),
+labels = c("Incoming PAR", "Outgoing PAR"),
+name = NULL
+) +
+scale_y_continuous(
+name = expression(PAR~"(µmol m"^-2~" s"^-1*")"),
+breaks = scales::pretty_breaks(n = 8)
+) +
+scale_x_datetime(
+date_breaks = "1 month",
+date_labels = "%b %Y"
+) +
+labs(
+x = "Date",
+title = " PAR In/Out"
+) +
+theme(
+legend.position = "top",
+axis.text.x = element_text(angle = 45, hjust = 1)
+)
+
+print(p_par)
 
 
 ```
@@ -945,40 +974,57 @@ p_par_IN / p_par_OUT
 
 ```{r, warning=FALSE}
 
-df$G = (df$SHF_6_37_1_1_1.c + df$SHF_6_37_2_1_1.c)/2
+### =========================================================================
 
+### 1. Filter Data and Calculate G (Soil Heat Flux) from July 2, 2025 Onward
 
-# -------------------------------
-# 4. Plot G (Soil Heat Flux)
-# -------------------------------
-p2 <- ggplot(df, aes(x = TIMESTAMP)) +
-  geom_line(aes(y = G, color = "Soil Heat Flux"), linewidth = 0.7) +
-  scale_y_continuous(
-    name = expression(Soil~Heat~Flux~(W/m^2)),
-    breaks = scales::pretty_breaks(n = 8),
-    expand = expansion(mult = 0.05)
-  ) +
-  scale_color_manual(
-    values = c("Soil Heat Flux" = "blue"),
-    labels = c("Soil Heat Flux"),
-    name = NULL
-  ) +
-  scale_x_datetime(
-    date_breaks = "1 month",
-    date_labels = "%b"
-  ) +
-  labs(
-    x = "",
-    title = "Soil Heat Flux — Full Year"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.title.y = element_text(color = "black"),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "top"
-  )
+### =========================================================================
 
-p2 
+df_filtered <- df %>%
+
+### Trims out all rows prior to July 1, 2025
+
+filter(TIMESTAMP >= as.POSIXct("2025-07-02", tz = "UTC")) %>%
+mutate(G = (SHF_6_37_1_1_1.c + SHF_6_37_2_1_1.c) / 2)
+
+### =========================================================================
+
+### 2. Plot G (Soil Heat Flux)
+
+### =========================================================================
+
+p2 <- ggplot(df_filtered, aes(x = TIMESTAMP)) +
+geom_line(aes(y = G, color = "Soil Heat Flux"), linewidth = 0.7) +
+scale_y_continuous(
+name = expression(Soil~Heat~Flux~(W/m^2)),
+breaks = scales::pretty_breaks(n = 8),
+expand = expansion(mult = 0.05)
+) +
+scale_color_manual(
+values = c("Soil Heat Flux" = "blue"),
+labels = c("Soil Heat Flux"),
+name = NULL
+) +
+
+### Updated date_labels to include %Y since it's no longer a full generic calendar year
+
+scale_x_datetime(
+date_breaks = "1 month",
+date_labels = "%b %Y"
+) +
+labs(
+x = "",
+title = "Soil Heat Flux — Post-Installation"
+) +
+theme_minimal() +
+theme(
+axis.title.y = element_text(color = "black"),
+axis.text.x = element_text(angle = 45, hjust = 1),
+legend.position = "top"
+)
+
+p2
+
 
 ```
 
@@ -1376,7 +1422,7 @@ p_rh
 ```
 
 
-# ANNUAL BAROMETRIC PRESSURE (uncleaned from sonic)
+# ANNUAL BAROMETRIC PRESSURE 
 
 
 ```{r, warning=FALSE}
@@ -1649,7 +1695,7 @@ print(p_albedo)
 ```
 # ANNUAL SNOW DEPTH
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, include=FALSE}
 # -------------------------------
 # Prepare snow depth
 # -------------------------------
