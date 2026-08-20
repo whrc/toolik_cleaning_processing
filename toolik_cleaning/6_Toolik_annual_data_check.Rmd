@@ -1243,7 +1243,7 @@ for (i in 1:nrow(time_blocks)) {
     filter(year == current_year & biweek == current_biweek)
   
   # Check if ALL soil and air temperature columns are entirely NA in this block
-  temp_cols <- c("TS_2_38_1_1_1.c", "TS_2_38_2_1_1.c", "TS_2_38_2_2_1", "TA_2_1_1_1_1.c")
+  temp_cols <- c("TS_2_38_1_1_1.c", "TS_2_38_2_1_1.c", "TS_2_38_2_2_1.c", "TA_2_1_1_1_1.c")
   valid_cols <- intersect(temp_cols, names(df_bw))
   
   if (nrow(df_bw) == 0 || (length(valid_cols) > 0 && all(sapply(df_bw[valid_cols], function(x) all(is.na(x)))))) {
@@ -1333,7 +1333,7 @@ p_swc_timeseries <- ggplot(df) +
   # Plot all depths over the true, continuous chronological TIMESTAMP axis
   geom_line(aes(x = TIMESTAMP, y = SWC_12_36_1_1_1.c * 100, color = "8 cm"), linewidth = 0.8, na.rm = FALSE) + 
   geom_line(aes(x = TIMESTAMP, y = SWC_12_36_2_1_1.c * 100, color = "18 cm"), linewidth = 0.8, na.rm = FALSE) + 
-  geom_line(aes(x = TIMESTAMP, y = SWC_12_36_2_2_1.c * 100, color = "28 cm"), linewidth = 0.8, na.rm = FALSE) + 
+  geom_line(aes(x = TIMESTAMP, y = SWC_12_36_3_1_1.c * 100, color = "28 cm"), linewidth = 0.8, na.rm = FALSE) + 
   
   # Map colors cleanly to soil depths
   scale_color_manual(
