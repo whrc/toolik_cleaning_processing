@@ -310,6 +310,239 @@ ggplot(data = df)+
 
 ```
 
+# Snow Depth
+```{r,  warning=FALSE}
+# SNOWDEPTH HAVE BEEN RECALCULATED FROM ALL LOGGER AND THEN ADDED TO MASTER DF AS SD_CORR
+# IT SHOULD BE USED ONLY BETWEEN 2025 05 TO 2026 04 26 - SEE CUTOFF DATES !
+
+plot_df <- df
+
+plot_df$SD_plot <- plot_df$SD_CORR
+
+plot_df$SD_plot[
+  plot_df$TIMESTAMP > as.POSIXct(
+    "2026-04-26 17:00",
+    tz = "UTC"
+  )
+] <-
+  plot_df$SD_10_99_1_1_1[
+    plot_df$TIMESTAMP > as.POSIXct(
+      "2026-04-26 17:00",
+      tz = "UTC"
+    )
+  ]
+
+
+ggplot(data = plot_df) +
+  geom_point(
+    aes(TIMESTAMP, SD_plot),
+    col = "black"
+  ) +
+  scale_y_continuous(
+    limits = c(-1, 1),
+    expression("Snow Depth (" * m * ")")
+  ) +
+  scale_x_datetime(
+    limits = as.POSIXct(biomet_dates)
+  )
+
+
+
+ggplot(data = df)+
+  geom_point(aes(TIMESTAMP,SD_10_99_1_1_1),col='black')+
+  scale_y_continuous(limits = c(-1,1),
+                     expression('Snow Depth ('*m*')'))+
+  scale_x_datetime(limits = as.POSIXct(biomet_dates))
+
+
+```
+
+
+```{r,  warning=FALSE}
+
+# ============================================================
+# COMBINE SNOW DEPTH DATA FOR DIAGNOSTICS
+# ============================================================
+# ============================================================
+# COMBINE SNOW DEPTH RECORDS
+# ============================================================
+
+SD_10_99_1_1_1 <- df$SD_10_99_1_1_1
+
+# Use corrected snow depth from May 6, 2025 09:30
+# through April 26, 2026 17:00
+
+start_corr <- as.POSIXct(
+  "2025-05-06 09:30",
+  tz = "UTC"
+)
+
+end_corr <- as.POSIXct(
+  "2026-04-26 17:00",
+  tz = "UTC"
+)
+
+SD_10_99_1_1_1[
+  df$TIMESTAMP >= start_corr &
+  df$TIMESTAMP <= end_corr
+] <-
+  df$SD_CORR[
+    df$TIMESTAMP >= start_corr &
+    df$TIMESTAMP <= end_corr
+  ]
+
+
+# ============================================================
+# DIAGNOSTICS
+# ============================================================
+
+hist(
+  SD_10_99_1_1_1,
+  breaks = 100
+)
+
+plot(
+  df$TIMESTAMP,
+  SD_10_99_1_1_1,
+  ylim = c(-1.5, 2.5)
+)
+
+abline(h = 0, col = "red")
+abline(h = 0.8, col = "red")
+
+
+# ============================================================
+# APPLY SNOW DEPTH LIMITS
+# ============================================================
+
+SD_10_99_1_1_1.limits <- SD_10_99_1_1_1
+
+SD_10_99_1_1_1.limits <- replace(
+  SD_10_99_1_1_1,
+  SD_10_99_1_1_1 < -0.3 |
+    SD_10_99_1_1_1 > 0.50,
+  NA
+)
+
+
+# ============================================================
+# PLOT AFTER LIMIT FILTER
+# ============================================================
+
+ggplot(data = df) +
+  geom_point(
+    aes(TIMESTAMP, SD_10_99_1_1_1.limits),
+    col = "black"
+  ) +
+  scale_y_continuous(
+    limits = c(-0.15, 1.00),
+    expression("Snow Depth (" * m * ")")
+  ) +
+  geom_hline(
+    yintercept = 0.60
+  ) +
+  scale_x_datetime(
+    limits = as.POSIXct(biomet_dates)
+  )
+
+
+# ============================================================
+# REMOVE NEGATIVE VALUES / OUTLIERS
+# ============================================================
+
+SD_10_99_1_1_1.limits <-
+  ifelse(
+    SD_10_99_1_1_1 > 1.00 |
+      SD_10_99_1_1_1 < 0,
+    NA,
+    SD_10_99_1_1_1.limits
+  )
+
+
+# ============================================================
+# FINAL CLEANED SNOW DEPTH
+# ============================================================
+
+df$SD_10_99_1_1_1.c <- SD_10_99_1_1_1.limits
+
+```
+
+## Rolling MAD
+```{r,  warning=FALSE}
+f = SD_10_99_1_1_1.limits # first make a new flux vector to apply the above filters
+# prepare the inputs for a zero-phase (forward and reverse) filter  
+ind       = which(complete.cases(f))   # first save the index of all the NAs
+b         = rep(1,8)/8                 # moving average coefficient
+a         = 1                          # coefficient of the ARMA filter
+mad_i    = filtfilt(b, a, na.omit(f)) #create a forward and reverse ARMA filter
+mad_filt = f                          # make a copy of the full fluxes again
+mad_filt[ind] = mad_i                # apply the filter where the real data exist
+
+n = 7*48 # set the length of the rolling filter, 48 half hours in day * x days
+roll.mad = rollapply(data = mad_filt,
+                     width = n,
+                     FUN = mad,
+                     partial = TRUE,
+                     na.rm = T,
+                     fill = NA)  #create a rolling MAD or sd or other
+roll.mad[is.na(mad_filt)] = NA  #make NA values where NAs exist in the real data
+
+```
+
+```{r,  warning=FALSE}
+
+ggplot(df)+geom_hline(yintercept = 0)+
+  geom_point(aes(TIMESTAMP,SD_10_99_1_1_1.limits,col='Snow Depth'))+
+  geom_line(aes(TIMESTAMP,mad_filt,col='Filter'))+
+  geom_line(aes(TIMESTAMP,roll.mad,col='MAD'))+
+  scale_y_continuous(limits = c(-.1,1))+
+  scale_x_datetime(limits = as.POSIXct(biomet_dates,format="%F"))+
+  scale_color_manual(values=c('yellow','red','black'))
+
+```
+
+```{r,  warning=FALSE}
+#adjust this value (N) to tweak how many MADs to be away from the norm
+N = 2
+
+#Add clean value to dataframe (_.c)
+
+df$SD_10_99_1_1_1.c = ifelse(abs(SD_10_99_1_1_1.limits - mad_filt) > (N * roll.mad),NA,SD_10_99_1_1_1.limits)
+
+#Compare cleaned vs. uncleaned
+
+ggplot(df)+geom_hline(yintercept = 0)+
+  geom_point(aes(TIMESTAMP,SD_10_99_1_1_1,col='Uncleaned'))+
+  geom_point(aes(TIMESTAMP,SD_10_99_1_1_1.c,col='Cleaned'))+
+  scale_y_continuous(limits = c(-0.75,2.1))+
+  scale_x_datetime(limits = as.POSIXct(biomet_dates,format="%F"))+
+  scale_color_manual(values=c('black','red'))
+```
+
+
+```{r,  warning=FALSE}
+ggplot(data = df)+
+  geom_ribbon(aes(x = TIMESTAMP,ymax = mad_filt+roll.mad*6,ymin = mad_filt-roll.mad*6,fill='6'))+
+  geom_ribbon(aes(x = TIMESTAMP,ymax = mad_filt+roll.mad*3,ymin = mad_filt-roll.mad*3,fill='3'))+
+  geom_ribbon(aes(x = TIMESTAMP,ymax = mad_filt+roll.mad*2,ymin = mad_filt-roll.mad*2,fill='2'))+
+  geom_ribbon(aes(x = TIMESTAMP,ymax = mad_filt+roll.mad*1,ymin = mad_filt-roll.mad*1,fill='1'))+
+  geom_point(aes(TIMESTAMP,SD_10_99_1_1_1.limits),col='red')+
+  geom_point(aes(TIMESTAMP,SD_10_99_1_1_1.c),col='black')+
+  scale_y_continuous(limits = c(-.25,1))
+#scale_x_datetime(limits = as.POSIXct(c('2024-09-26','2024-12-02'),format="%F"))
+
+```
+
+
+
+
+
+
+
+
+
+
+
 
 
 # PAR IN 
@@ -337,7 +570,7 @@ plot(PPFD_7_21_1_1_1.limits)
 df$PPFD_7_21_1_1_1.c = PPFD_7_21_1_1_1.limits
 ```
 
-PAR OUT
+#PAR OUT
 ```{r, warning=FALSE}
 ggplot(data = df)+
   geom_point(aes(TIMESTAMP,PPFDR_7_23_1_1_1),col='black')+
