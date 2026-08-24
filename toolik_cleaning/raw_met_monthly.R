@@ -13,184 +13,559 @@ library(purrr)
 #ALL LOGGER 
 
 
-setwd("C:/Users/klynoe/Documents/toolik/raw_data/met/")
 
+# ============================================================
+# PATHS
+# ============================================================
 
-na_strings <- c("-9999","NA","NaN","NAN","-7999")
+raw_path <- "C:/Users/klynoe/Documents/toolik/raw_data/met/annual_met"
 
-files <- c(
-  "toolik-gth89-AllLogger.dat",
-  "toolik-gth89-AllLogger_until20260727.dat"
+base_path <- "C:/Users/klynoe/Documents/toolik/R_outputs/met/"
+
+dir.create(
+  base_path,
+  recursive = TRUE,
+  showWarnings = FALSE
 )
 
-# read header once (authoritative column set)
-h <- fread(files[1], skip = 1, nrows = 0, na.strings = na_strings)
-
-# read all files, allow different column counts
-df <- rbindlist(
-  lapply(files, fread,
-         skip = 4,
-         header = FALSE,
-         na.strings = na_strings,
-         fill = TRUE),
-  fill = TRUE
+na_strings <- c(
+  "-9999",
+  "NA",
+  "NaN",
+  "NAN",
+  "-7999"
 )
 
-# enforce column names
-setnames(df, names(h))
 
-# convert TIMESTAMP safely
-df[, TIMESTAMP := as.POSIXct(TIMESTAMP, tz = "UTC")]
+# ============================================================
+# FUNCTION TO LOAD VARIABLE-STRUCTURE DAT FILES
+# ============================================================
+# Each file can have a different number of columns.
+# Each file gets its own header.
 
-# deduplicate
-setkey(df, TIMESTAMP)
-df <- unique(df)
-
-#df = rbind.fill(df,met)
-df = df[!duplicated(df$TIMESTAMP),]
-
-
-timestamp_cutoff <- as.POSIXct("2026-01-01 14:00", format = "%Y-%m-%d %H:%M", tz = "UTC")
-df <- df %>%
-  dplyr::filter(TIMESTAMP >= timestamp_cutoff)
-
-
-# Create a complete sequence of timestamps at 30-minute intervals
-tsdf <- data.frame(TIMESTAMP = seq(
-  from = min(df$TIMESTAMP),
-  to = max(df$TIMESTAMP),
-  by = 60*30
-))
-
-
-df = merge(tsdf,df,by = 'TIMESTAMP',all.x = T)
-
-#####SPLIT AND WRITE ALLOGGER####
-
-base_path = "C:/Users/klynoe/Documents/toolik/R_outputs/met/"
-
-met=df
-
-met <- met %>%
-  mutate(TIMESTAMP = as.POSIXct(TIMESTAMP, tz = "UTC"))
-
-
-data_nested = met %>%
-  mutate(TIMESTAMP = as.POSIXct(TIMESTAMP, format = "%Y-%m-%d %H:%M:%S")) %>%
-  mutate(year_month = format(TIMESTAMP, "%Y%m")) %>%
-  group_by(year_month) %>%
-  nest() %>%
-  ungroup() %>%  # Important to prevent errors with grouped data
-  mutate(file_path = paste0(base_path, "toolik_gth89_logger_", year_month, ".csv"))
-
-walk2(
-  .x = data_nested$data, 
-  .y = data_nested$file_path, 
-  ~ {
-    .x <- .x %>%
-      mutate(
-        TIMESTAMP = format(as.POSIXct(TIMESTAMP, tz = "UTC"),
-                           "%Y-%m-%d %H:%M")
-      )
+load_toolik_files <- function(files) {
+  
+  # -----------------------------
+  # Read headers
+  # -----------------------------
+  
+  h_list <- lapply(
+    files,
+    fread,
+    skip = 1,
+    nrows = 0,
+    na.strings = na_strings
+  )
+  
+  
+  # -----------------------------
+  # Read data
+  # -----------------------------
+  
+  dat_list <- lapply(
+    files,
+    fread,
+    skip = 4,
+    header = FALSE,
+    na.strings = na_strings,
+    fill = TRUE
+  )
+  
+  
+  # -----------------------------
+  # Apply individual headers
+  # -----------------------------
+  
+  for (i in seq_along(dat_list)) {
     
-    write.csv(.x, .y, row.names = FALSE)
+    h <- names(h_list[[i]])
+    
+    # If data has MORE columns than header
+    if (length(h) < ncol(dat_list[[i]])) {
+      
+      h <- c(
+        h,
+        paste0(
+          "extra_",
+          seq_len(
+            ncol(dat_list[[i]]) - length(h)
+          )
+        )
+      )
+    }
+    
+    # If header has MORE columns than data
+    if (length(h) > ncol(dat_list[[i]])) {
+      
+      h <- h[
+        seq_len(
+          ncol(dat_list[[i]])
+        )
+      ]
+    }
+    
+    names(dat_list[[i]]) <- h
   }
+  
+  
+  # -----------------------------
+  # Combine all files
+  # -----------------------------
+  
+  df <- rbindlist(
+    dat_list,
+    use.names = TRUE,
+    fill = TRUE
+  )
+  
+  
+  # -----------------------------
+  # Timestamp
+  # -----------------------------
+  
+  df[, TIMESTAMP := as.POSIXct(
+    TIMESTAMP,
+    tz = "UTC"
+  )]
+  
+  
+  # Remove invalid timestamps
+  
+  df <- df[
+    !is.na(TIMESTAMP)
+  ]
+  
+  
+  # -----------------------------
+  # Sort and remove duplicates
+  # -----------------------------
+  
+  setorder(
+    df,
+    TIMESTAMP
+  )
+  
+  df <- unique(
+    df,
+    by = "TIMESTAMP"
+  )
+  
+  
+  return(df)
+}
+
+
+# ============================================================
+# ALL LOGGER
+# ============================================================
+
+logger_files <- list.files(
+  path = raw_path,
+  pattern = "^toolik-gth89-AllLogger(_.*)?\\.dat$",
+  recursive = TRUE,
+  full.names = TRUE
+)
+
+basename(logger_files)
+
+
+logger <- load_toolik_files(
+  logger_files
 )
 
 
+# ============================================================
+# LOGGER DATE CUTOFF
+# ============================================================
 
-#ALL BIOMET#
-rm(list = ls())
-setwd("C:/Users/klynoe/Documents/toolik/raw_data/met/")
-
-
-na_strings <- c("-9999","NA","NaN","NAN","-7999")
-
-files <- c(
-  "toolik-gth89-AllBiomet.dat",
-  "toolik-gth89-AllBiomet_until20260727.dat"
+timestamp_cutoff <- as.POSIXct(
+  "2026-03-01 00:00",
+  format = "%Y-%m-%d %H:%M",
+  tz = "UTC"
 )
 
-# read header once (authoritative column set)
-h <- fread(files[1], skip = 1, nrows = 0, na.strings = na_strings)
+logger <- logger[
+  TIMESTAMP >= timestamp_cutoff
+]
 
-# read all files, allow different column counts
-df <- rbindlist(
-  lapply(files, fread,
-         skip = 4,
-         header = FALSE,
-         na.strings = na_strings,
-         fill = TRUE),
-  fill = TRUE
+
+# ============================================================
+# COMPLETE 30-MINUTE TIME GRID
+# ============================================================
+
+tsdf <- data.table(
+  TIMESTAMP = seq(
+    from = min(logger$TIMESTAMP),
+    to = max(logger$TIMESTAMP),
+    by = 30 * 60
+  )
 )
 
-# enforce column names
-setnames(df, names(h))
 
-# convert TIMESTAMP safely
-df[, TIMESTAMP := as.POSIXct(TIMESTAMP, tz = "UTC")]
-
-# deduplicate
-setkey(df, TIMESTAMP)
-df <- unique(df)
-df = df[!duplicated(df$TIMESTAMP),]
+logger <- merge(
+  tsdf,
+  logger,
+  by = "TIMESTAMP",
+  all.x = TRUE
+)
 
 
-timestamp_cutoff <- as.POSIXct("2026-04-30 23:59", format = "%Y-%m-%d %H:%M", tz = "UTC")
-df <- df %>%
-  dplyr::filter(TIMESTAMP >= timestamp_cutoff)
+# ============================================================
+# SPLIT LOGGER BY MONTH
+# ============================================================
+
+logger <- logger %>%
+  mutate(
+    TIMESTAMP = as.POSIXct(
+      TIMESTAMP,
+      tz = "UTC"
+    ),
+    year_month = format(
+      TIMESTAMP,
+      "%Y%m"
+    )
+  )
 
 
-# Create a complete sequence of timestamps at 30-minute intervals
-tsdf <- data.frame(TIMESTAMP = seq(
-  from = min(df$TIMESTAMP),
-  to = max(df$TIMESTAMP),
-  by = 60*30
-))
-
-
-df = merge(tsdf,df,by = 'TIMESTAMP',all.x = T)
-
-
-base_path = "C:/Users/klynoe/Documents/toolik/R_outputs/met/"
-
-met=df
-
-# -----------------------------
-# Ensure TIMESTAMP is POSIXct
-# -----------------------------
-met <- met %>%
-  mutate(TIMESTAMP = as.POSIXct(TIMESTAMP, tz = "UTC"))
-
-######FOR EDDYPRO BIOMET SKIP NESTING AND SPLITTING!!!####
-
-# -----------------------------
-# Nest by year_month and prepare file paths
-# -----------------------------
-data_nested <- met %>%
-  mutate(year_month = format(TIMESTAMP, "%Y%m")) %>%
+logger_nested <- logger %>%
   group_by(year_month) %>%
   nest() %>%
   ungroup() %>%
-  mutate(file_path = paste0(base_path, "toolik_gth89_biomet_", year_month, ".csv"))
+  mutate(
+    file_path = file.path(
+      base_path,
+      paste0(
+        "toolik_gth89_logger_",
+        year_month,
+        ".csv"
+      )
+    )
+  )
 
-# -----------------------------
-# Write each nested data frame
-# -----------------------------
+
+# ============================================================
+# WRITE MONTHLY LOGGER FILES
+# ============================================================
+
 walk2(
-  .x = data_nested$data, 
-  .y = data_nested$file_path, 
+  logger_nested$data,
+  logger_nested$file_path,
   ~ {
-    # Format TIMESTAMP explicitly before writing
-    .x <- .x %>%
-      mutate(TIMESTAMP = format(TIMESTAMP, "%Y-%m-%d %H:%M"))
     
-    write.csv(.x, .y, row.names = FALSE)
+    dat <- .x
+    
+    
+    # -----------------------------
+    # Remove column 2 (RECORD)
+    # -----------------------------
+    
+    # dat <- dat %>%
+    #  select(-2)
+    
+    
+    # -----------------------------
+    # Remove completely empty columns
+    # -----------------------------
+    
+    dat <- dat %>%
+      select(
+        where(
+          ~ !all(is.na(.))
+        )
+      )
+    
+    
+    # -----------------------------
+    # Format timestamp
+    # -----------------------------
+    
+    dat <- dat %>%
+      mutate(
+        TIMESTAMP = format(
+          TIMESTAMP,
+          "%Y-%m-%d %H:%M"
+        )
+      )
+    
+    
+    # -----------------------------
+    # Write CSV
+    # -----------------------------
+    
+    write.csv(
+      dat,
+      .y,
+      row.names = FALSE,
+      na = "NA"
+    )
   }
 )
-#########PRINT FULL BIOMET WITH UNITS#####
 
-#1# GET RID OF THE RECORD ROW (COL2) set time
+#####################################
+                               #ALL BIOMET#
+                                ####~~####
+
+
+# 1. Define folder path and list all AllBiomet files
+
+# ============================================================
+# 1. PATHS
+# ============================================================
+
+fp <- "C:/Users/klynoe/Documents/toolik/raw_data/met/annual_met/"
+
+base_path <- "C:/Users/klynoe/Documents/toolik/R_outputs/met/"
+
+dir.create(base_path, recursive = TRUE, showWarnings = FALSE)
+
+
+# ============================================================
+# 2. FIND ALL BIOMET FILES
+# ============================================================
+
+files <- list.files(
+  path = fp,
+  pattern = "^toolik-gth89-AllBiomet(_.*)?\\.dat$",
+  recursive = TRUE,
+  full.names = TRUE
+)
+
+files
+length(files)
+
+
+# ============================================================
+# 3. READ EACH FILE
+# ============================================================
+# Each file gets its own header because the column structure
+# may change between files.
+#
+# Header is on line 2 (skip = 1)
+# Data begin on line 5 (skip = 4)
+
+h_list <- lapply(
+  files,
+  fread,
+  skip = 1,
+  nrows = 0
+)
+
+dat_list <- lapply(
+  files,
+  fread,
+  skip = 4,
+  header = FALSE,
+  na.strings = c(
+    "-9999",
+    "NA",
+    "NaN",
+    "NAN",
+    "-7999"
+  ),
+  fill = TRUE
+)
+
+
+# ============================================================
+# 4. APPLY EACH FILE'S OWN HEADER
+# ============================================================
+
+for (i in seq_along(dat_list)) {
+  
+  # Get header
+  h <- names(h_list[[i]])
+  
+  # Make sure the number of names matches the data
+  if (length(h) < ncol(dat_list[[i]])) {
+    
+    # Add names for unexpected extra columns
+    h <- c(
+      h,
+      paste0(
+        "extra_",
+        seq_len(ncol(dat_list[[i]]) - length(h))
+      )
+    )
+    
+  } else if (length(h) > ncol(dat_list[[i]])) {
+    
+    # Trim header if necessary
+    h <- h[seq_len(ncol(dat_list[[i]]))]
+  }
+  
+  names(dat_list[[i]]) <- h
+}
+
+
+# ============================================================
+# 5. COMBINE ALL FILES
+# ============================================================
+# use.names = TRUE + fill = TRUE means:
+#
+# File 1: TIMESTAMP, AirT, RH, Wind
+# File 2: TIMESTAMP, AirT, RH, Wind, PAR
+#
+# becomes:
+#
+# TIMESTAMP, AirT, RH, Wind, PAR
+#
+# with NA where PAR did not exist.
+
+df_bio <- rbindlist(
+  dat_list,
+  use.names = TRUE,
+  fill = TRUE
+)
+
+
+# ============================================================
+# 6. CLEAN TIMESTAMP
+# ============================================================
+
+df_bio[, TIMESTAMP := as.POSIXct(
+  TIMESTAMP,
+  tz = "UTC"
+)]
+
+
+# Remove rows with invalid/missing timestamps
+df_bio <- df_bio[
+  !is.na(TIMESTAMP)
+]
+
+
+# ============================================================
+# 7. REMOVE DUPLICATE TIMESTAMPS
+# ============================================================
+# If multiple files overlap, retain the first occurrence.
+
+setorder(df_bio, TIMESTAMP)
+
+df_bio <- unique(
+  df_bio,
+  by = "TIMESTAMP"
+)
+
+
+# ============================================================
+# 8. CREATE COMPLETE 30-MINUTE TIME GRID
+# ============================================================
+
+start_date <- as.POSIXct(
+  "2026-03-01 00:00:00",
+  tz = "UTC"
+)
+
+stop_date <- as.POSIXct(
+  "2026-07-30 23:30:00",
+  tz = "UTC"
+)
+
+tsdf <- data.table(
+  TIMESTAMP = seq(
+    from = start_date,
+    to = stop_date,
+    by = 30 * 60
+  )
+)
+
+
+# ============================================================
+# 9. MERGE BIOMET DATA ONTO COMPLETE TIME GRID
+# ============================================================
+
+met <- merge(
+  tsdf,
+  df_bio,
+  by = "TIMESTAMP",
+  all.x = TRUE
+)
+
+
+# ============================================================
+# 10. SPLIT BY MONTH
+# ============================================================
+
+met <- met %>%
+  mutate(
+    TIMESTAMP = as.POSIXct(
+      TIMESTAMP,
+      tz = "UTC"
+    ),
+    year_month = format(
+      TIMESTAMP,
+      "%Y%m"
+    )
+  )
+
+
+# ============================================================
+# 11. NEST BY MONTH
+# ============================================================
+
+data_nested <- met %>%
+  group_by(year_month) %>%
+  nest() %>%
+  ungroup() %>%
+  mutate(
+    file_path = file.path(
+      base_path,
+      paste0(
+        "toolik_gth89_biomet_",
+        year_month,
+        ".csv"
+      )
+    )
+  )
+
+
+# ============================================================
+# 12. WRITE MONTHLY FILES
+# ============================================================
+
+walk2(
+  data_nested$data,
+  data_nested$file_path,
+  ~ {
+    
+    dat <- .x 
+    
+    # Remove column 2 (RECORD)
+    dat <- dat %>%
+      select(-2)
+    
+    # Remove columns that are completely NA
+    dat <- dat %>%
+      select(
+        where(~ !all(is.na(.)))
+      )
+    
+    # Format timestamp
+    dat <- dat %>%
+      mutate(
+        TIMESTAMP = format(
+          TIMESTAMP,
+          "%Y-%m-%d %H:%M"
+        )
+      )
+    
+    write.csv(
+      dat,
+      .y,
+      row.names = FALSE,
+      na = "NA"
+    )
+  }
+)
+
+
+
+
+
+
+   #########PRINT FULL BIOMET WITH UNITS#####
+~~~~~~~~~~#NEEDS UPDATE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!<--------------!
+           #1# GET RID OF THE RECORD ROW (COL2) set time
 
 met = met [,-2]
 

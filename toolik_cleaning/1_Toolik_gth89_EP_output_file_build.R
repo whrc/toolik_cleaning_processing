@@ -91,7 +91,7 @@ df_master <- unique(df_master, by = "TIMESTAMP")
 
 # 6. Generate a continuous 30-minute time grid starting from your specific date
 start_date <- as.POSIXct("2025-05-06 09:30:00", tz = "UTC")
-stop_date = as.POSIXct("2026-07-23 18:00:00", tz = "UTC")
+stop_date = as.POSIXct("2026-07-30 23:30:00", tz = "UTC")
 ts_grid <- data.frame(TIMESTAMP = seq(
   from = start_date,
   to = stop_date,
@@ -127,7 +127,7 @@ DF_1 <- merge(met, flux, by = "TIMESTAMP", all = TRUE)
 ###############
 ##ADD TOMST - REFORMAT AND MERGE
 
-tomst = read.csv("C:/Users/klynoe/Documents/toolik/R_outputs/TOMST_combined_20260728.csv", header = T)
+tomst = read.csv("C:/Users/klynoe/Documents/toolik/R_outputs/TOMST_combined_long_20260728.csv", header = T)
 
 
 # Create variable names
@@ -378,7 +378,7 @@ write.csv(df, "C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik-gth89-AllBi
 #####################
 
 ####################
-###READ ALL RAE MONTHLY BIOMET FILES AND MERGE TO ONE
+###READ ALL RAw MONTHLY BIOMET FILES AND MERGE TO ONE
 ####ADD TOMST AND FLUX####
 
 fp = 'C:/Users/klynoe/Documents/toolik/R_outputs/met/monthly'

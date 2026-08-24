@@ -173,70 +173,9 @@ for (i in 1:nrow(time_blocks)) {
 }
 
 ```
-#BI WEEKLY CO2
+
 
 ```{r, warning=FALSE}
-
-
-# 1. Arrange data, extract year, and calculate biweek relative to EACH year's start
-df <- df %>% 
-  arrange(TIMESTAMP) %>% 
-  mutate(year = as.numeric(format(TIMESTAMP, "%Y"))) %>% 
-  group_by(year) %>% 
-  mutate(
-    biweek = as.numeric(floor((as.numeric(TIMESTAMP) - min(as.numeric(TIMESTAMP))) / (14 * 24 * 3600))) + 1
-  ) %>% 
-  ungroup()
-
-# 2. Get unique combinations of year and biweek, sorted chronologically
-time_blocks <- df %>% 
-  distinct(year, biweek) %>% 
-  arrange(year, biweek)
-
-# 3. Loop: print separate plot for each year and bi-week window
-for (i in 1:nrow(time_blocks)) {
-  current_year   <- time_blocks$year[i]
-  current_biweek <- time_blocks$biweek[i]
-  
-  # Filter data for this specific year and biweek
-  df_bw <- df %>% 
-    filter(year == current_year & biweek == current_biweek)
-  
-  #  Skip if column doesn't exist, is empty, or contains ONLY NA values
-  if (!"co2_flux.c" %in% names(df_bw) || nrow(df_bw) == 0 || all(is.na(df_bw$co2_flux.c))) {
-    next
-  }
-  
-  p <- ggplot(data = df_bw) + 
-    geom_hline(yintercept = 0) + 
-    geom_point(
-      data = subset(df_bw, !is.na(co2_flux.flag)), 
-      aes(TIMESTAMP, co2_flux, color = co2_flux.flag), 
-      alpha = 0.7
-    ) + 
-    geom_point(
-      aes(TIMESTAMP, co2_flux.c), 
-      color = 'black', 
-      alpha = 0.7
-    ) + 
-    scale_y_continuous(limits = c(-18, 18)) + 
-    scale_x_datetime(
-      date_breaks = "1 day", 
-      date_labels = "%d-%b"
-    ) + 
-    scale_color_manual(values = color_map, name = "Cleaning Flag") + 
-    labs(
-      title = bquote(CO[2]~"Flux — " * .(current_year) * " Bi-Week " * .(current_biweek)), 
-      x = "Day", 
-      y = expression(paste(CO[2], " Flux (µmol m"^-2," s"^-1,")"))
-    ) + 
-    theme_bw() + 
-    theme(
-      axis.text.x = element_text(angle = 45, hjust = 1)
-    )
-  
-  print(p)
-}
 
 
 
@@ -358,69 +297,8 @@ for (i in 1:nrow(time_blocks)) {
 
 ```
 
-#BI WEEKLY CH4
+
 ```{r, warning=FALSE}
-
-# 1. Arrange data, extract year, and calculate biweek relative to EACH year's start
-df <- df %>% 
-  arrange(TIMESTAMP) %>% 
-  mutate(year = as.numeric(format(TIMESTAMP, "%Y"))) %>% 
-  group_by(year) %>% 
-  mutate(
-    biweek = as.numeric(floor((as.numeric(TIMESTAMP) - min(as.numeric(TIMESTAMP))) / (14 * 24 * 3600))) + 1
-  ) %>% 
-  ungroup()
-
-# 2. Get unique combinations of year and biweek, sorted chronologically
-time_blocks <- df %>% 
-  distinct(year, biweek) %>% 
-  arrange(year, biweek)
-
-# 3. Loop: print separate plot for each year and bi-week window
-for (i in 1:nrow(time_blocks)) {
-  current_year   <- time_blocks$year[i]
-  current_biweek <- time_blocks$biweek[i]
-  
-  # Filter data for this specific year and biweek
-  df_bw <- df %>% 
-    filter(year == current_year & biweek == current_biweek)
-  
-  # CRITICAL UPDATE: Skip if column doesn't exist, is empty, or contains ONLY NA values
-  if (!"ch4_flux.c" %in% names(df_bw) || nrow(df_bw) == 0 || all(is.na(df_bw$ch4_flux.c))) {
-    next
-  }
-  
-  p <- ggplot(data = df_bw) + 
-    geom_hline(yintercept = 0) + 
-    geom_point(
-      data = subset(df_bw, !is.na(ch4_flux.flag)), 
-      aes(TIMESTAMP, ch4_flux, color = ch4_flux.flag), 
-      alpha = 0.7
-    ) + 
-    geom_point(
-      aes(TIMESTAMP, ch4_flux.c), 
-      color = "black", 
-      alpha = 0.7
-    ) + 
-    # Daily x-axis ticks
-    scale_x_datetime(
-      date_breaks = "1 day", 
-      date_labels = "%d-%b"
-    ) + 
-    scale_color_manual(values = color_map, name = "QC CH4 Flux") + 
-    labs(
-      # Updated title to explicitly display both Year and Bi-Week index
-      title = bquote(CH[4]~"Flux — " * .(current_year) * " Bi-Week " * .(current_biweek)), 
-      x = "Time", 
-      y = expression(paste(CH, " Flux (µmol m"^-2," s"^-1,")"))
-    ) + 
-    theme_bw() + 
-    theme(
-      axis.text.x = element_text(angle = 45, hjust = 1)
-    )
-  
-  print(p)
-}
 
 
 
@@ -1202,120 +1080,10 @@ plot_monthly_soil_air(df)
 
 
 ```
-# BI WEEKLY AIR T VS SOIL T
+
 
 ```{r, warning=FALSE}
 
-# 1. Handle sensor name change / historical merge before loop
-cutoff_date <- as.POSIXct("2026-05-01 00:00:00", tz = "UTC")
-
-if (!"TS_2_38_2_2_1" %in% names(df)) {
-  df$TS_2_38_2_2_1 <- NA
-}
-
-df <- df %>%
-  mutate(
-    TS_2_38_2_2_1 = if_else(TIMESTAMP <= cutoff_date, TS_2_38_23_1_1, TS_2_38_2_2_1)
-  )
-
-# 2. Arrange data, extract year, and calculate biweek relative to EACH year's start
-df <- df %>% 
-  arrange(TIMESTAMP) %>% 
-  mutate(year = as.numeric(format(TIMESTAMP, "%Y"))) %>% 
-  group_by(year) %>% 
-  mutate(
-    biweek = as.numeric(floor((as.numeric(TIMESTAMP) - min(as.numeric(TIMESTAMP))) / (14 * 24 * 3600))) + 1
-  ) %>% 
-  ungroup()
-
-# 3. Get unique combinations of year and biweek, sorted chronologically
-time_blocks <- df %>% 
-  distinct(year, biweek) %>% 
-  arrange(year, biweek)
-
-# 4. Loop: print separate stacked plot for each year and bi-week window
-for (i in 1:nrow(time_blocks)) {
-  current_year   <- time_blocks$year[i]
-  current_biweek <- time_blocks$biweek[i]
-  
-  # Filter data for this specific year and biweek
-  df_bw <- df %>% 
-    filter(year == current_year & biweek == current_biweek)
-  
-  # Check if ALL soil and air temperature columns are entirely NA in this block
-  temp_cols <- c("TS_2_38_1_1_1.c", "TS_2_38_2_1_1.c", "TS_2_38_2_2_1.c", "TA_2_1_1_1_1.c")
-  valid_cols <- intersect(temp_cols, names(df_bw))
-  
-  if (nrow(df_bw) == 0 || (length(valid_cols) > 0 && all(sapply(df_bw[valid_cols], function(x) all(is.na(x)))))) {
-    next
-  }
-  
-  # ------------------------------- 
-  # Soil Temperature Plot 
-  # ------------------------------- 
-  p_soil <- ggplot(df_bw) + 
-    theme_bw() + 
-    geom_hline(yintercept = 0, linetype = "dashed", color = "black") + 
-    geom_line(
-      aes(x = TIMESTAMP, y = TS_2_38_1_1_1.c, color = "8 cm"), 
-      linewidth = 0.8, na.rm = FALSE
-    ) + 
-    geom_line(
-      aes(x = TIMESTAMP, y = TS_2_38_2_1_1.c, color = "18 cm"), 
-      linewidth = 0.8, na.rm = FALSE
-    ) + 
-    # UPDATED: Now plotting the newly consolidated 28 cm column
-    geom_line(
-      aes(x = TIMESTAMP, y = TS_2_38_2_2_1, color = "28 cm"), 
-      linewidth = 0.8, na.rm = FALSE
-    ) + 
-    scale_color_manual(
-      values = c("8 cm" = "blue", "18 cm" = "green", "28 cm" = "gold3"), 
-      breaks = c("8 cm", "18 cm", "28 cm"), 
-      name = NULL
-    ) + 
-    scale_x_datetime(
-      date_breaks = "1 day", 
-      date_labels = "%d-%b"
-    ) + 
-    labs(
-      x = "", 
-      y = expression("Temperature ("*degree*C*")"), 
-      title = paste0("Soil Temperatures — ", current_year, " Bi-Week ", current_biweek)
-    ) + 
-    theme(
-      legend.position = "top", 
-      axis.text.x = element_text(angle = 45, hjust = 1)
-    )
-  
-  # ------------------------------- 
-  # Air Temperature Plot 
-  # ------------------------------- 
-  p_air <- ggplot(df_bw) + 
-    theme_bw() + 
-    geom_hline(yintercept = 0, linetype = "dashed", color = "black") + 
-    geom_line(
-      aes(x = TIMESTAMP, y = TA_2_1_1_1_1.c), 
-      color = "red", linewidth = 0.8, na.rm = FALSE
-    ) + 
-    scale_x_datetime(
-      date_breaks = "1 day", 
-      date_labels = "%d-%b"
-    ) + 
-    labs(
-      x = "", 
-      y = expression("Temperature ("*degree*C*")"), 
-      title = paste0("Air Temperature — ", current_year, " Bi-Week ", current_biweek)
-    ) + 
-    theme(
-      axis.text.x = element_text(angle = 45, hjust = 1)
-    )
-  
-  # ------------------------------- 
-  # Stack and print 
-  # ------------------------------- 
-  print(p_soil / p_air)
-}
 
 
 
@@ -1428,7 +1196,7 @@ p_rh
 ```{r, warning=FALSE}
 
 # 0. Define the cutoff threshold date
-cutoff_date <- as.POSIXct("2026-05-01 00:00:00", tz = "UTC")
+cutoff_date <- as.POSIXct("2026-05-01 00:00:00", tz = "UTC") # from when going from 7500 pres. to HMP 
 
 # =========================================================================
 # 1. Merge Sensors Chronologically and Calculate Deep Rolling Smooth
@@ -1458,6 +1226,8 @@ p_pres <- ggplot(df_pres_smooth, aes(x = TIMESTAMP)) +
   
   # Highly smoothed trend line that still drops off during gaps
   geom_line(aes(y = pres_smooth), color = "black", linewidth = 0.8, na.rm = FALSE) +
+  
+  geom_vline(xintercept = cutoff_date, col = 'blue', linetype = 'dashed') +
   
   scale_y_continuous(
     name = "Air Pressure (kPa)",
@@ -1573,68 +1343,9 @@ for (i in 1:nrow(timeline_blocks)) {
 
 ```
 
-# BI WEEKLY AIR TEMP CHECK (HMP VS SONIC)
+
 
 ```{r, warning=FALSE}
-
-# 1. Arrange chronologically and calculate 14-day grouping blocks
-df <- df %>% 
-  arrange(TIMESTAMP) %>% 
-  mutate(biweek = as.numeric(floor((as.numeric(TIMESTAMP) - min(as.numeric(TIMESTAMP))) / (14 * 24 * 3600))) + 1)
-
-biweeks <- sort(unique(df$biweek))
-plots <- list()
-
-# 2. Loop through each 14-day window block
-for (b in biweeks) {
-  df_bw <- df %>% filter(biweek == b)
-  
-  # Skip completely empty time segments or segments filled only with NAs
-  if (nrow(df_bw) == 0 || (all(is.na(df_bw$TA_2_1_1_1_1.c)) && all(is.na(df_bw$sonic_temperature)))) {
-    next
-  }
-  
-  # Extract the calendar dates for the start and end of this specific bi-weekly window
-  start_date_str <- format(min(df_bw$TIMESTAMP), "%b %d, %Y")
-  end_date_str   <- format(max(df_bw$TIMESTAMP), "%b %d, %Y")
-  
-  # Create a descriptive title showing the actual time span
-  window_title <- paste0("Temperature Comparison: ", start_date_str, " — ", end_date_str)
-  
-  # Build the isolated plot
-  p <- ggplot(df_bw, aes(x = TIMESTAMP)) + 
-    geom_line(aes(y = TA_2_1_1_1_1.c, color = "Air Temp"), linewidth = 0.8) + 
-    geom_line(aes(y = sonic_temperature - 273.15, color = "Sonic Temp"), linewidth = 0.8) + 
-    geom_hline(yintercept = 0, linetype = "dashed", color = "black") + 
-    scale_color_manual(values = c("Air Temp" = "red", "Sonic Temp" = "blue")) + 
-    # High-resolution time axis tailored for 2-week spans
-    scale_x_datetime(
-      date_breaks = "2 days",
-      date_labels = "%b %d"
-    ) +
-    labs(
-      x = "", 
-      y = expression("Temperature ("*degree*C*")"), 
-      color = "Sensor", 
-      title = window_title,
-      subtitle = paste("Bi-Weekly Window Period Index:", b)
-    ) + 
-    theme_bw() + 
-    theme(
-      axis.text.x = element_text(angle = 45, hjust = 1),
-      legend.position = "top"
-    )
-  
-  # Save the plot object into the tracking array environment
-  plots[[paste0("temp_biweek_", b)]] <- p
-}
-
-# =========================================================================
-# 3. Print Validated Plots
-# =========================================================================
-for (name in names(plots)) {
-  print(plots[[name]])
-}
 
 
 
@@ -1816,6 +1527,7 @@ for (i in 1:nrow(wind_blocks)) {
 #SONIC VS. YOUNG
 ```{r, warning=F, echo=FALSE}
 
+#YOUNG INSTALLED
 
 # Filter out missing rows and calculate the absolute difference between the two wind variables
 df_wind_clean <- df %>% 
