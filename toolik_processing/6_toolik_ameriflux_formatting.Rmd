@@ -1,5 +1,5 @@
 ---
-title: "Prep for Ameriflux - Pond Inlet"
+title: "Prep for Ameriflux - Toolik"
 author: "Kyle Arndt"
 date: "2024-02-15"
 output: html_document
@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = 'C:/Users/klynoe/Documents/pond_inlet/gapfill/') #use this to set your directory
+knitr::opts_knit$set(root.dir = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/') #use this to set your directory
 ```
 
 Libraries
@@ -22,17 +22,21 @@ Sys.setenv(TZ = "UTC")
 
 Load Data
 ```{r}
-df = fread(input = "./data/mtk_gapfilled_clean_2024.csv")
+df = fread(input = "toolik_flux_c_met_c_tms_2025_2026.csv")
 
 # Subset out 2024 data (starts at end of other ameriflux file)
 
-df <- df[df$ts > as.POSIXct("2023-12-30 17:00", tz = "UTC"), ]
+#df$ts = df$TIMESTAMP
+
+#df <- df[df$TIMESTAMP > as.POSIXct("2025-05-06 09:30", tz = "UTC"), ]
+
+df$TIMESTAMP <-as.POSIXct(df$TIMESTAMP, format ="%Y-%m-%d %H:%M", tz = "UTC" )
 
 ```
 
 Format the time stamps at start and end
 ```{r}
-TIMESTAMP_END = df$ts
+TIMESTAMP_END = df$TIMESTAMP
 
 yeare = format(TIMESTAMP_END,"%Y")
 monthe = format(TIMESTAMP_END,"%m")
@@ -42,7 +46,7 @@ mine = format(TIMESTAMP_END,"%M")
 
 TIMESTAMP_END = paste(yeare,monthe,daye,houre,mine,sep = '')
 
-TIMESTAMP_START = df$ts - 30*60
+TIMESTAMP_START = df$TIMESTAMP - 30*60
 
 years = format(TIMESTAMP_START,"%Y")
 months = format(TIMESTAMP_START,"%m")
@@ -73,17 +77,17 @@ CH4_MIXING_RATIO = ifelse(df$ch4_mixing_ratio<0,NA,df$ch4_mixing_ratio*1000) #co
 #Gas Fluxes ######################
 #CO2 flux is umol m-2 s-1
 FC   = df$co2_flux.c
-FC_F = ifelse(is.na(df$co2_flux.c),df$rfnee,df$co2_flux.c)
+#FC_F = ifelse(is.na(df$co2_flux.c),df$rfnee,df$co2_flux.c)
 FCH4 = df$ch4_flux.c*1000 #convert from umol m-2 s-1 to nmol m-2 s-1
-FCH4_F = ifelse(is.na(df$ch4_flux.c),df$rfch4,df$ch4_flux.c)*1000 #convert from umol m-2 s-1 to nmol m-2 s-1
+#FCH4_F = ifelse(is.na(df$ch4_flux.c),df$rfch4,df$ch4_flux.c)*1000 #convert from umol m-2 s-1 to nmol m-2 s-1
 FH2O = df$h2o_flux
 
-GPP_F   = df$GPP_f
+#GPP_F   = df$GPP_f
 #GPP_DT  = df$GPP_DT
-RECO_F    = df$Reco
+#RECO_F    = df$Reco
 #RECO_DT = df$Reco_DT
-GPP  = ifelse(!is.na(df$co2_flux.c) & df$co2_flux.c != -9999 & df$co2_flux.c != 9999, df$GPP_f, NA)
-RECO = ifelse(!is.na(df$co2_flux.c) & df$co2_flux.c != -9999 & df$co2_flux.c != 9999,df$Reco, NA)
+#GPP  = ifelse(!is.na(df$co2_flux.c) & df$co2_flux.c != -9999 & df$co2_flux.c != 9999, df$GPP_f, NA)
+#RECO = ifelse(!is.na(df$co2_flux.c) & df$co2_flux.c != -9999 & df$co2_flux.c != 9999,df$Reco, NA)
 
 
 #energy fluxes ###########################
@@ -93,14 +97,14 @@ H       = df$H.c
 LE      = df$LE.c
 
 #meteorology and weather #################################
-TA      = df$airT    # Air T in Deg C
+TA      = df$TA_2_1_1_1_1.c# Air T in Deg C
 SVP     = 610.7*10^((7.5*TA)/(237.3+TA)) #NOT INCLUDED IN FINAL
-PA      = df$PA_4_2_1_1_1.c    # air pressure in kPA
+PA      = df$AIR_P_COMB.c    # air pressure in kPA
 RH      = df$RH.c   #RH in %
 T_SONIC = df$sonic_temperature-273.15 #sonic temp in Deg C
 VPD     = ((100 - RH)/100)*SVP/100 #VPD in hPA
 D_SNOW  = df$SD_10_99_1_1_1.c*100  # snow depth in cm
-P       = df$P_RAIN_8_19_1_1_1 # rain in mm
+#P       = df$P_RAIN_8_19_1_1_1 # rain in mm
 
 #Radiation #####################################
 ALB = df$ALB_1_1_1.c*100 #albedo in %
@@ -117,40 +121,46 @@ PPFD_OUT = df$PPFDR_7_23_1_1_1.c # par out umol m-2 s-1
 
 #Soil factors ###################################
 #all swc in %
-SWC_1_1_1 = df$SWC_12_36_1_1_1
-SWC_1_2_1 = df$SWC_12_36_1_2_1
-SWC_1_3_1 = df$SWC_12_36_1_3_1
+SWC_1_1_1 = df$SWC_12_36_1_1_1.c
+SWC_1_2_1 = df$SWC_12_36_2_1_1.c
+SWC_1_3_1 = df$SWC_12_36_3_1_1.c
 
 #all soil temps deg C
-TS_1_1_1 = df$TS_2_38_1_1_1
-TS_1_2_1 = df$TS_2_38_1_2_1
-TS_1_3_1 = df$TS_2_38_1_3_1
+TS_1_1_1 = df$TS_2_38_1_1_1.c
+TS_1_2_1 = df$TS_2_38_2_1_1.c
+TS_1_3_1 = df$TS_2_38_2_2_1.c
 
-TS_2_1_1  = df$TS_2_38_3_1_1.c
-TS_2_2_1  = df$TS_2_38_3_2_1.c
-TS_2_3_1  = df$TS_2_38_3_3_1.c
-TS_2_4_1  = df$TS_2_38_3_4_1.c
-TS_2_5_1  = df$TS_2_38_3_5_1.c
-TS_2_6_1  = df$TS_2_38_3_6_1.c
-TS_2_7_1  = df$TS_2_38_3_7_1.c
-TS_2_8_1  = df$TS_2_38_3_8_1.c
-TS_2_9_1  = df$TS_2_38_3_9_1.c
-TS_2_10_1 = df$TS_2_38_3_10_1.c
-TS_2_11_1 = df$TS_2_38_3_11_1.c
-TS_2_12_1 = df$TS_2_38_3_12_1.c
-
-
+TA_8_1_1 = df$TMS_W_T_1
+TS_8_1_1 = df$TMS_W_T_2
+TS_8_2_1 = df$TMS_W_T_3
+TA_9_1_1 = df$TMS_N_T_1
+TS_9_1_1 = df$TMS_N_T_2
+TS_9_2_1 = df$TMS_N_T_3
+TA_10_1_1 = df$TMS_S_T_1
+TS_10_1_1 = df$TMS_S_T_2
+TS_10_2_1 = df$TMS_S_T_3
+TA_11_1_1 = df$TMS_E_T_1
+TS_11_1_1 = df$TMS_E_T_2
+TS_11_2_1 = df$TMS_E_T_3
+TA_12_1_1 = df$TMS_C_T_1
+TS_12_1_1 = df$TMS_C_T_2
+TS_12_2_1 = df$TMS_C_T_3
+SWC_8_1_1 = df$TMS_W_VWC
+SWC_9_1_1 = df$TMS_N_VWC
+SWC_10_1_1 = df$TMS_S_VWC
+SWC_11_1_1 = df$TMS_E_VWC
+SWC_12_1_1 = df$TMS_C_VWC
 
 #wind and turbulence parameters ##############################
 MO_LENGTH = df$L
-ZL        = df$`(z-d)/L`
-TAU       = df$Tau
+ZL        = df$X.z.d..L
+TAU       = df$Tau.c
 
 U_SIGMA = sqrt(df$u_var)
 V_SIGMA = sqrt(df$v_var)
 W_SIGMA = sqrt(df$w_var)
 
-USTAR = df$`u*`
+USTAR = df$u.
 
 WD     = df$WD_20_35_1_1_1
 WS     = df$WS_16_33_1_1_1
@@ -184,13 +194,13 @@ plot(CH4_MIXING_RATIO) #nmol
 
 ```{r}
 plot(FC)
-plot(FC_F)
+#plot(FC_F)
 plot(FCH4)
-plot(FCH4_F)
+#plot(FCH4_F)
 plot(FH2O)
-plot(GPP_F)
+#plot(GPP_F)
 #plot(GPP_DT)
-plot(RECO)
+#plot(RECO)
 #plot(RECO_DT)
 ```
 
@@ -208,7 +218,7 @@ plot(T_SONIC)
 plot(TA)   
 plot(VPD) 
 plot(D_SNOW)
-plot(P)
+#plot(P)
 ```
 
 ```{r}
@@ -233,19 +243,27 @@ plot(TS_1_3_1)
 ```
 
 ```{r}
-plot(TS_2_1_1)
-plot(TS_2_2_1)
-plot(TS_2_3_1)
-plot(TS_2_4_1)
-plot(TS_2_5_1)
-plot(TS_2_6_1)
-plot(TS_2_7_1)
-plot(TS_2_8_1)
-plot(TS_2_9_1)
-#plot(TS_3_10_1)
-#plot(TS_3_11_1)
-#plot(TS_3_12_1)
 
+plot(TA_8_1_1)
+plot(TS_8_1_1)
+plot(TS_8_2_1)
+plot(TA_9_1_1)
+plot(TS_9_1_1)
+plot(TS_9_2_1)
+plot(TA_10_1_1)
+plot(TS_10_1_1)
+plot(TS_10_2_1)
+plot(TA_11_1_1)
+plot(TS_11_1_1)
+plot(TS_11_2_1)
+plot(TA_12_1_1)
+plot(TS_12_1_1)
+plot(TS_12_2_1)
+plot(SWC_8_1_1)
+plot(SWC_9_1_1)
+plot(SWC_10_1_1)
+plot(SWC_11_1_1)
+plot(SWC_12_1_1)
 
 ```
 
@@ -273,12 +291,12 @@ plot(TAU_SSITC_TEST)
 
 
 ```{r}
-CA_MTK = data.frame(TIMESTAMP_START,TIMESTAMP_END,
+US_RTS = data.frame(TIMESTAMP_START,TIMESTAMP_END,
   CO2,CH4,H2O
 ,CO2_MIXING_RATIO,CH4_MIXING_RATIO
 #,CO2_SIGMA,CH4_SIGMA ,H2O_SIGMA 
 ,FC,FCH4,FH2O
-,FC_F,FCH4_F,GPP_F,RECO_F,RECO, GPP
+#,FC_F,FCH4_F,GPP_F,RECO_F,RECO, GPP
 #,GPP_DT,RECO_DT
 ,G_1_1_1,G_2_1_1
 ,H
@@ -289,7 +307,7 @@ CA_MTK = data.frame(TIMESTAMP_START,TIMESTAMP_END,
 ,TA   
 ,VPD 
 ,D_SNOW
-,P
+#,P
 ,ALB
 ,LW_IN
 ,LW_OUT
@@ -304,15 +322,26 @@ CA_MTK = data.frame(TIMESTAMP_START,TIMESTAMP_END,
 ,TS_1_1_1
 ,TS_1_2_1
 ,TS_1_3_1
-,TS_2_1_1
-,TS_2_2_1
-,TS_2_3_1
-,TS_2_4_1
-,TS_2_5_1
-,TS_2_6_1
-,TS_2_7_1
-,TS_2_8_1
-,TS_2_9_1
+,TA_8_1_1 
+,TS_8_1_1  
+,TS_8_2_1 
+,TA_9_1_1 
+,TS_9_1_1 
+,TS_9_2_1 
+,TA_10_1_1 
+,TS_10_1_1 
+,TS_10_2_1 
+,TA_11_1_1 
+,TS_11_1_1 
+,TS_11_2_1 
+,TA_12_1_1 
+,TS_12_1_1 
+,TS_12_2_1
+,SWC_8_1_1 
+,SWC_9_1_1
+,SWC_10_1_1 
+,SWC_11_1_1 
+,SWC_12_1_1 
 
 ,MO_LENGTH,ZL,TAU,U_SIGMA,V_SIGMA,W_SIGMA,USTAR,WD,WS,WS_MAX
 ,FC_SSITC_TEST,FCH4_SSITC_TEST,H_SSITC_TEST,LE_SSITC_TEST,TAU_SSITC_TEST)
@@ -321,14 +350,14 @@ CA_MTK = data.frame(TIMESTAMP_START,TIMESTAMP_END,
 
 Write off final csv with Ameriflux naming convention
 ```{r}
-siteID = "CA-MTK"
+siteID = "US-RTS"
 resolution = 'HH'
-tsstart = CA_MTK$TIMESTAMP_START[1]
-tsend   = CA_MTK$TIMESTAMP_END[nrow(CA_MTK)]
+tsstart = US_RTS$TIMESTAMP_START[1]
+tsend   = US_RTS$TIMESTAMP_END[nrow(US_RTS)]
 
 filename = paste(siteID,resolution,tsstart,tsend,sep = '_')
 filename = paste("./",filename,".csv",sep = "")
 
-write.csv(x = CA_MTK,file = filename,row.names = F,na = "-9999")
+write.csv(x = US_RTS,file = filename,row.names = F,na = "-9999")
 ```
 
