@@ -226,6 +226,30 @@ ggplot(df) + geom_point(aes(TIMESTAMP, combined_pressure), alpha = 0.5) + geom_v
 df$AIR_P_COMB.c = ifelse(df$TIMESTAMP < cutoff_date, df$air_p_mean.c, df$PA_4_2_1_1_1.c)
 
 ```
+#ADDING WIND COMPONENTS! ALL WIND IS FROM 3D SONIC UNTIL 2026 04 28 
+```{r, warning=F}
+#work in progress - need to think about this
+#4/28/2026 1:30 date when 2d is up and running
+
+hist(df$WS_16_33_1_1_1, breaks = 50)
+hist(df$wind_speed, breaks = 50)
+
+plot(df$WS_16_33_1_1_1,df$wind_speed)
+
+hist(df$MWS_16_34_1_1_1, breaks = 50)
+hist(df$max_wind_speed, breaks = 50)
+
+
+hist(df$WD_20_35_1_1_1, breaks = 100)
+hist(df$wind_dir, breaks = 100)
+
+
+
+
+
+
+```
+
 
 #Soil Heat Flux
 ```{r, warning=FALSE}

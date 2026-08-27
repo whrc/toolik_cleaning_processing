@@ -162,9 +162,9 @@ W_SIGMA = sqrt(df$w_var)
 
 USTAR = df$u.
 
-WD     = df$WD_20_35_1_1_1
-WS     = df$WS_16_33_1_1_1
-WS_MAX = df$MWS_16_34_1_1_1
+WD     = df$wind_dir # keeping all sonic values here for consistency for 7500 annual data file
+WS     = df$wind_speed             #shift to 2d from 2026 04 28 01:30 - so for 7200 use 2d
+WS_MAX = df$max_wind_speed
 
 #Quality flags from EP (Mauder and Foken) ################
 FC_SSITC_TEST   = df$qc_co2_flux
