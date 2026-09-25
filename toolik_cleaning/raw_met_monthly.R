@@ -18,9 +18,9 @@ library(purrr)
 # PATHS
 # ============================================================
 
-raw_path <- "C:/Users/klynoe/Documents/toolik/raw_data/met/annual_met"
+raw_path <- "C:/Users/klynoe/Documents/toolik/raw_data/met"
 
-base_path <- "C:/Users/klynoe/Documents/toolik/R_outputs/met/"
+base_path <- "C:/Users/klynoe/Documents/toolik/R_outputs/met/monthly/"
 
 dir.create(
   base_path,
@@ -312,9 +312,9 @@ walk2(
 # 1. PATHS
 # ============================================================
 
-fp <- "C:/Users/klynoe/Documents/toolik/raw_data/met/annual_met/"
+fp <- "C:/Users/klynoe/Documents/toolik/raw_data/met/"
 
-base_path <- "C:/Users/klynoe/Documents/toolik/R_outputs/met/"
+base_path <- "C:/Users/klynoe/Documents/toolik/R_outputs/met/monthly/"
 
 dir.create(base_path, recursive = TRUE, showWarnings = FALSE)
 
@@ -457,7 +457,7 @@ start_date <- as.POSIXct(
 )
 
 stop_date <- as.POSIXct(
-  "2026-07-30 23:30:00",
+  "2026-08-31 23:30:00",
   tz = "UTC"
 )
 

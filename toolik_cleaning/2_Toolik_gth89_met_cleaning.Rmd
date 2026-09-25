@@ -34,7 +34,7 @@ library(dplyr)
 
 ```{r, warning=FALSE}
 
-df = read.csv('C:/Users/klynoe/Documents/toolik/R_outputs/toolik_met_flux_merged_aligned_2025_2026.csv')
+df = read.csv('C:/Users/klynoe/Documents/toolik/R_outputs/toolik_met_flux_merged_aligned_202603_202607.csv')
 sd = read.csv('C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik_gth89_snowdepth.csv')
 
 df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
@@ -72,7 +72,7 @@ df = merge(df,sd,by = 'TIMESTAMP', all.x = T)
 ```
 
 ```{r, warning=FALSE}
-biomet_dates <- c('2025-05-01', '2026-08-01')
+biomet_dates <- c('2026-03-01', '2026-07-31')
 #biomet_dates <- c('2024-10-30', '2024-12-01')
 ```
 
@@ -236,11 +236,11 @@ hist(df$wind_speed, breaks = 50)
 
 plot(df$WS_16_33_1_1_1,df$wind_speed)
 
-hist(df$MWS_16_34_1_1_1, breaks = 50)
+#hist(df$MWS_16_34_1_1_1, breaks = 50)
 hist(df$max_wind_speed, breaks = 50)
 
 
-hist(df$WD_20_35_1_1_1, breaks = 100)
+#hist(df$WD_20_35_1_1_1, breaks = 100)
 hist(df$wind_dir, breaks = 100)
 
 
@@ -279,15 +279,37 @@ ggplot(data = df_filtered) +
 
 ## SHF1
 ```{r, warning=FALSE}
-# -------------------------------
-# -------------------------------
-cutoff_time = as.POSIXct("2025-07-01 11:30", tz = "UTC")
+# ============================================================
+# SHF1
+# ============================================================
+
+cutoff_time <- as.POSIXct(
+  "2025-07-01 11:30",
+  tz = "UTC"
+)
+
+shf1_start <- as.POSIXct(
+  "2026-07-28 12:00:00",
+  tz = "UTC"
+)
+
+shf1_end <- as.POSIXct(
+  "2026-07-31 23:30:00",
+  tz = "UTC"
+)
 
 df$SHF_6_37_1_1_1.c <- df$SHF_6_37_1_1_1
 
-# FIX: Combined all three conditions inside brackets, assigned NA outside
-df$SHF_6_37_1_1_1.c[df$SHF_6_37_1_1_1 < -55 | df$SHF_6_37_1_1_1 > 190 | df$TIMESTAMP < cutoff_time] <- NA
-
+df$SHF_6_37_1_1_1.c[
+  df$SHF_6_37_1_1_1 < -55 |
+  df$SHF_6_37_1_1_1 > 190 |
+  df$TIMESTAMP < cutoff_time |
+  (
+    df$TIMESTAMP >= shf1_start &
+    df$TIMESTAMP <= shf1_end &
+    df$SHF_6_37_1_1_1 > 40
+  )
+] <- NA
 # -------------------------------
 # 2. Optional: check with histogram and plot
 # -------------------------------
@@ -304,16 +326,37 @@ abline(v = cutoff_time, col = "blue", lty = 2) # show cutoff
 
 ## SHF2
 ```{r, warning=FALSE}
-## -------------------------------
-# SHF 2: limits + cutoff time
-# -------------------------------
-cutoff_time <- as.POSIXct("2025-07-01 11:30", tz = "UTC")
+# ============================================================
+# SHF2
+# ============================================================
+
+cutoff_time <- as.POSIXct(
+  "2025-07-01 11:30",
+  tz = "UTC"
+)
+
+shf2_start <- as.POSIXct(
+  "2026-07-28 12:00:00",
+  tz = "UTC"
+)
+
+shf2_end <- as.POSIXct(
+  "2026-07-31 23:30:00",
+  tz = "UTC"
+)
 
 df$SHF_6_37_2_1_1.c <- df$SHF_6_37_2_1_1
 
-# FIX: Added missing OR operator, uncommented timestamp, assigned NA outside brackets
-df$SHF_6_37_2_1_1.c[df$SHF_6_37_2_1_1 < -75 | df$SHF_6_37_2_1_1 > 150 | df$TIMESTAMP < cutoff_time] <- NA
-
+df$SHF_6_37_2_1_1.c[
+  df$SHF_6_37_2_1_1 < -75 |
+  df$SHF_6_37_2_1_1 > 150 |
+  df$TIMESTAMP < cutoff_time |
+  (
+    df$TIMESTAMP >= shf2_start &
+    df$TIMESTAMP <= shf2_end &
+    df$SHF_6_37_2_1_1 > 40
+  )
+] <- NA
 # -------------------------------
 # Verification Plots
 # -------------------------------
@@ -533,7 +576,7 @@ ggplot(df)+geom_hline(yintercept = 0)+
 
 ```{r,  warning=FALSE}
 #adjust this value (N) to tweak how many MADs to be away from the norm
-N = 2
+N = 3
 
 #Add clean value to dataframe (_.c)
 
@@ -952,7 +995,7 @@ end_date <- as.POSIXct("2026-08-23 23:59:59", tz = "UTC")
 
 df_filtered <- df %>%
   mutate(TIMESTAMP_true = as.POSIXct(TIMESTAMP, tz = "UTC")) %>%
-  filter(TIMESTAMP_true >= cutoff & TIMESTAMP_true <= end_date)
+  dplyr::filter(TIMESTAMP_true >= cutoff & TIMESTAMP_true <= end_date)
 
 # Common styling variables
 lbl_y_temp <- expression("Temperature ("*degree*C*")")
@@ -970,7 +1013,7 @@ color_map  <- c(
 # =========================================================================
 # Filter out rows where all loggers are NA for this specific depth
 df_p1 <- df_filtered %>% 
-  filter(!is.na(TMS_C_T_1) | !is.na(TMS_E_T_1) | !is.na(TMS_W_T_1) | !is.na(TMS_N_T_1) | !is.na(TMS_S_T_1))
+  dplyr::filter(!is.na(TMS_C_T_1) | !is.na(TMS_E_T_1) | !is.na(TMS_W_T_1) | !is.na(TMS_N_T_1) | !is.na(TMS_S_T_1))
 
 p1 <- ggplot(df_p1, aes(x = TIMESTAMP_true)) +
   theme_minimal() +
@@ -991,7 +1034,7 @@ print(p1)
 # PLOT 2: 0cm Ground Surface Temperature Horizon
 # =========================================================================
 df_p2 <- df_filtered %>% 
-  filter(!is.na(TMS_C_T_2) | !is.na(TMS_E_T_2) | !is.na(TMS_W_T_2) | !is.na(TMS_N_T_2) | !is.na(TMS_S_T_2))
+  dplyr::filter(!is.na(TMS_C_T_2) | !is.na(TMS_E_T_2) | !is.na(TMS_W_T_2) | !is.na(TMS_N_T_2) | !is.na(TMS_S_T_2))
 
 p2 <- ggplot(df_p2, aes(x = TIMESTAMP_true)) +
   theme_minimal() +
@@ -1012,7 +1055,7 @@ print(p2)
 # PLOT 3: -10cm Soil Temperature Horizon
 # =========================================================================
 df_p3 <- df_filtered %>% 
-  filter(!is.na(TMS_C_T_3) | !is.na(TMS_E_T_3) | !is.na(TMS_W_T_3) | !is.na(TMS_N_T_3) | !is.na(TMS_S_T_3))
+  dplyr::filter(!is.na(TMS_C_T_3) | !is.na(TMS_E_T_3) | !is.na(TMS_W_T_3) | !is.na(TMS_N_T_3) | !is.na(TMS_S_T_3))
 
 p3 <- ggplot(df_p3, aes(x = TIMESTAMP_true)) +
   theme_minimal() +
@@ -1033,7 +1076,7 @@ print(p3)
 # PLOT 4: -10cm Soil Moisture Horizon (VWC)
 # =========================================================================
 df_p4 <- df_filtered %>% 
-  filter(!is.na(TMS_C_VWC) | !is.na(TMS_E_VWC) | !is.na(TMS_W_VWC) | !is.na(TMS_N_VWC) | !is.na(TMS_S_VWC))
+  dplyr::filter(!is.na(TMS_C_VWC) | !is.na(TMS_E_VWC) | !is.na(TMS_W_VWC) | !is.na(TMS_N_VWC) | !is.na(TMS_S_VWC))
 
 p4 <- ggplot(df_p4, aes(x = TIMESTAMP_true)) +
   theme_minimal() +
@@ -1064,7 +1107,7 @@ df <- df[!duplicated(df$TIMESTAMP), ]
 
 df$TIMESTAMP <- format(as.POSIXct(df$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
 df$ts = format(as.POSIXct(df$ts), format ="%Y-%m-%d %H:%M")
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_tms_c_2025_2026.csv',row.names = F,quote = T)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_tms_c_202603_202607.csv',row.names = F,quote = T)
 
 ```
 

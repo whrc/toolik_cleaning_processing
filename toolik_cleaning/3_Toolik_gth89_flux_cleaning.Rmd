@@ -40,7 +40,7 @@ Load in eddypro output files
 ```
 
 ```{r, warning=FALSE}
-df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_tms_c_2025_2026.csv')
+df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_tms_c_202603_202607.csv')
 
 df[, TIMESTAMP := as.POSIXct(TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")]
 df$ts = df$TIMESTAMP
@@ -51,38 +51,54 @@ df$ts = df$TIMESTAMP
 #Creates a variable to input a date range for the plots in the flux section of
 #cleaning code. Used to easily change date range for different data sets. 
 ```{r, warning=FALSE}
-flux_dates <- c("2025-05-01",'2026-08-01')
+flux_dates <- c("2026-03-01",'2026-07-31')
 ```
 
 #Create Flags
 ```{r, warning=FALSE}
-df$Tau.flag <- as.numeric(df$qc_Tau)
-df$co2_flux.flag <- as.numeric(df$qc_co2_flux)
-df$ch4_flux.flag <- as.numeric(df$qc_ch4_flux)
-df$LE.flag <- as.numeric(df$qc_LE)
-df$H.flag <- as.numeric(df$qc_H)
+# 
+# ============================================================
+# CREATE QC FLAGS
+# Keep original qc_* columns unchanged
+# Final .flag columns remain numeric until plotting
+# ============================================================
 
+df$Tau.flag      <- suppressWarnings(as.numeric(as.character(df$qc_Tau)))
+df$co2_flux.flag <- suppressWarnings(as.numeric(as.character(df$qc_co2_flux)))
+df$ch4_flux.flag <- suppressWarnings(as.numeric(as.character(df$qc_ch4_flux)))
+df$LE.flag       <- suppressWarnings(as.numeric(as.character(df$qc_LE)))
+df$H.flag        <- suppressWarnings(as.numeric(as.character(df$qc_H)))
 
-#check that it worked
-plot(df$qc_co2_flux, df$co2_flux.flag)
+# Check flag values
+lapply(
+  c("Tau.flag",
+    "co2_flux.flag",
+    "ch4_flux.flag",
+    "LE.flag",
+    "H.flag"),
+  function(x) sort(unique(df[[x]][!is.na(df[[x]])]))
+)
 
 ```
+
+
+
 #designate summer/winter cutoff for flux filtering senistivity
 
 ```{r, warning=FALSE}
 
-df <- df %>%
-  mutate(
-    season = case_when(
-      month(TIMESTAMP) >= 6 & month(TIMESTAMP) <= 9 ~ "summer",
-      TRUE ~ "winter"
-    )
-  )
+#df <- df %>%
+ # mutate(
+  #  season = case_when(
+   #   month(TIMESTAMP) >= 6 & month(TIMESTAMP) <= 9 ~ "summer",
+    #  TRUE ~ "winter"
+  #  )
+#  )
 
-summary(df$season)
+#summary(df$season)
 # Plot to check
-ggplot(data = df)+
-  geom_point(aes(x = TIMESTAMP, y = co2_flux, color = season))
+#ggplot(data = df)+
+ # geom_point(aes(x = TIMESTAMP, y = co2_flux, color = season))
 
 ```
 
@@ -91,6 +107,11 @@ ggplot(data = df)+
 combine energy fluxes by met and flux components
 
 ```{r}
+df$month <- factor(
+  format(df$TIMESTAMP, "%b"),
+  levels = month.abb
+)
+
 df$met = ((df$LWIN_6_14_1_1_1.c + df$SWIN_6_10_1_1_1.c) -
          (df$LWOUT_6_15_1_1_1.c + df$SWOUT_6_11_1_1_1.c)) -
         ((df$SHF_6_37_1_1_1.c + df$SHF_6_37_2_1_1.c)/2)
@@ -112,7 +133,7 @@ y_max = 500
 line_start = max(x_min, y_min)
 line_end = min(x_max, y_max)
 # Plot
-ggplot(df, aes(x = met, y = flux)) +
+ggplot(df, aes(x = met, y = flux, color = month)) +
   geom_point(alpha = 0.5) +
   geom_smooth(method = "lm", color = "blue", se = FALSE) +
   geom_segment(aes(x = line_start, y = line_start,
@@ -211,6 +232,130 @@ plot(Tau.limits)
 
 ```
 
+# Diagnostics Cleaning
+Clean some data based on instrument diagnostics
+```{r}
+signal.threshold.co2 <- ifelse(
+  df$sig_strength_7500_mean >= 75, 0, 1 #for 7200 when installed in may 2026
+)
+
+#signal.threshold.co2 <- ifelse(
+#  df$co2_signal_strength_7200_mean >= 75, 0, 1 #for 7200 when installed in may 2026
+#)
+signal.threshold.h2o <- ifelse(
+  df$sig_strength_7500_mean >= 75, 0, 1
+)
+
+#signal.threshold.h2o <- ifelse(
+ # df$co2_signal_strength_7200_mean >= 75, 0, 1 #use when 7200 is part of df
+#)
+
+signal.threshold.ch4 <- ifelse(
+  df$rssi_7700_mean >= 10, 0, 1
+)
+
+
+ggplot(data = df)+
+  geom_point(aes(ts,co2_flux,color=signal.threshold.co2))+
+  scale_y_continuous(limits = c(-20,20))
+
+ggplot(data = df)+
+  geom_point(aes(ts,ch4_flux,color=signal.threshold.ch4))+
+  scale_y_continuous(limits = c(-0.5,0.25))
+
+ggplot(data = df)+
+  geom_point(aes(ts,LE,color=signal.threshold.h2o))+
+  scale_y_continuous(limits = c(-200,500))
+
+
+co2_flux.qc <- replace(                          #CHANGING THIS FROM .SS TO .QC FOR ALL VARIABLES
+  co2_flux.qc,
+  df$signal_mean <= 75,
+  NA
+)
+
+ch4_flux.qc <- replace(
+  ch4_flux.qc,
+  df$rssi_mean <= 10,
+  NA
+)
+
+LE.qc <- replace(
+  LE.qc,
+  df$signal_mean <= 75,
+  NA
+)
+
+# ============================================================
+# CO2 SIGNAL DIAGNOSTIC FLAG = 5
+# ============================================================
+
+df$co2_flux.flag <- ifelse(
+  is.na(co2_flux.qc) &
+  !is.na(df$co2_flux) &
+  df$co2_flux.flag != 2,
+  5,
+  df$co2_flux.flag
+)
+
+# ============================================================
+# CH4 SIGNAL DIAGNOSTIC FLAG = 5
+# ============================================================
+
+df$ch4_flux.flag <- ifelse(
+  is.na(ch4_flux.qc) &
+  !is.na(df$ch4_flux) &
+  df$ch4_flux.flag != 2,
+  5,
+  df$ch4_flux.flag
+)
+
+# ============================================================
+# LE SIGNAL DIAGNOSTIC FLAG = 5
+# ============================================================
+
+df$LE.flag <- ifelse(
+  is.na(LE.qc) &
+  !is.na(df$LE) &
+  df$LE.flag != 2,
+  5,
+  df$LE.flag
+)
+
+```
+
+#first monthly overview to detect bad data
+
+```{r, warning=FALSE}
+
+df$month <- format(df$TIMESTAMP, "%m")
+
+for (m in unique(df$month)) {
+  
+  d <- df[df$month == m, ]
+  d$signal.threshold.co2 <- signal.threshold.co2[df$month == m]
+  
+  p <- ggplot(d, aes(x = TIMESTAMP, y = co2_flux)) +
+    geom_hline(yintercept = 0) +
+    geom_point(
+      aes(color = factor(signal.threshold.co2)),
+      alpha = 0.9,
+      size = 1.2
+    ) +
+    scale_y_continuous(limits = c(-20, 20)) +
+    scale_color_manual(
+      values = c("0" = "black", "1" = "red"),
+      labels = c("0" = "Signal OK", "1" = "Signal < 75"),
+      name = "Signal strength"
+    ) +
+    theme_minimal() +
+    ggtitle(paste("CO2 flux - Month:", m))
+  
+  print(p)
+}
+```
+
+
 ### NEE
 
 Plot NEE Histogram and what we might clean
@@ -249,7 +394,38 @@ hist(co2_flux.limits,breaks=100)
 
 ### CH4
 
-Plot CH4 Histogram and what we might clean
+#first monthly overview to detect bad data
+
+```{r, warning=FALSE}
+
+df$month <- format(df$TIMESTAMP, "%m")
+
+for (m in unique(df$month)) {
+  
+  d <- df[df$month == m, ]
+  d$signal.threshold.ch4 <- signal.threshold.ch4[df$month == m]
+  
+  p <- ggplot(d, aes(x = TIMESTAMP, y = ch4_flux)) +
+    geom_hline(yintercept = 0) +
+    geom_point(
+      aes(color = factor(signal.threshold.ch4)),
+      alpha = 0.9,
+      size = 1.2
+    ) +
+    scale_y_continuous(limits = c(-0.1, 0.2)) +
+    scale_color_manual(
+      values = c("0" = "black", "1" = "red"),
+      labels = c("0" = "Signal OK", "1" = "Signal < 10"),
+      name = "Signal strength"
+    ) +
+    theme_minimal() +
+    ggtitle(paste("CH4 flux - Month:", m))
+  
+  print(p)
+}
+```
+
+#Plot CH4 Histogram and what we might clean
 
 ```{r, warning=FALSE}
 hist(df$ch4_flux,breaks=100)
@@ -338,15 +514,15 @@ Clean based on graphs, create new variable (H.limits), and see cleaned product
 
 ```{r, warning=FALSE}
 # Define absolute limits - these will vary greatly depending on time of year
-H_upper <- 220 #did 100 for 7200 not as high
-H_lower <- -150
+H_upper <- 250 #did 100 for 7200 not as high
+H_lower <- -180
 
 # Create a "limited" vector for plotting and filtering
 H.limits <- df$H
 H.limits[df$H < H_lower | df$H > H_upper] <- NA
 
 # Assign flag 3 (absolute limits) only if not already flagged as 2
-df$H.flag[is.na(df$H.limits) & !is.na(df$H) & df$H.flag != 2] <- 3
+df$H.flag[is.na(H.limits) & !is.na(df$H) & df$H.flag != 2] <- 3
 
 
 hist(H.limits,breaks = 100)
@@ -376,7 +552,7 @@ LE.limits <- df$LE
 LE.limits[df$LE < LE_lower | df$LE > LE_upper] <- NA
 
 # Assign flag 3 (absolute limits) only if not already flagged as 2
-df$LE.flag[is.na(df$LE.limits) & !is.na(df$LE) & df$LE.flag != 2] <- 3
+df$LE.flag[is.na(LE.limits) & !is.na(df$LE) & df$LE.flag != 2] <- 3
 
 hist(LE.limits)
 plot(LE.limits)
@@ -404,7 +580,7 @@ pick threshold and filter based on plots above, I liked .065
 
 created flag to indicate where u* values are below our threshold- makes cleaning with u* optional but easy when using cleaned data sets
 ```{r, warning=FALSE}
-df$u_flag = ifelse(df$`u*` < Uthreshold,1,0)
+df$u_flag = ifelse(df$`u.` < Uthreshold,1,0)
 ```
 
 ## Combine Cleaning
@@ -428,12 +604,10 @@ plot(df$ts,Hclean)
 plot(df$ts,LEclean)
 plot(df$ts,Tauclean)
 ```
-
 Add cleaned tau to dataframe (no MAD filter)
 ```{r, warning=FALSE}
 df$Tau.c = Tauclean
 ```
-
 # MAD Filter
 
 Now, Spike filtering on half-hourly fluxes. For this type of data, filters based on median rather than std perform better. Use Unsymmetric Distributions and double MAD -MAD=Median Absolute Deviation for more info see link below <https://eurekastatistics.com/using-the-median-absolute-deviation-to-find-outliers/>
@@ -475,14 +649,19 @@ now filter the data based on this signal
 #adjust this value (N) to tweak how many MADs to be away from the norm
 ## Use 3 here for 7200 summer, 7 for 7200 winter; in future use 4 for 7500
 
-N.summer = 3
-N.winter = 6
+#N.summer = 3
+#N.winter = 6
 #Add clean value to dataframe (_.c)
-df$co2_flux.c <- ifelse(
-  df$season == "summer",
-  ifelse(abs(co2fluxclean - Flux_filt) > (N.summer * roll.mad),NA,co2fluxclean),
-    ifelse(abs(co2fluxclean - Flux_filt) > (N.winter * roll.mad),NA,co2fluxclean)
-)
+#df$co2_flux.c <- ifelse(
+ # df$season == "summer",
+#  ifelse(abs(co2fluxclean - Flux_filt) > (N.summer * roll.mad),NA,co2fluxclean),
+ #   ifelse(abs(co2fluxclean - Flux_filt) > (N.winter * roll.mad),NA,co2fluxclean)
+#)
+N = 5
+
+#Add clean value to dataframe (_.c)
+
+df$co2_flux.c = ifelse(abs(co2fluxclean - Flux_filt) > (N * roll.mad),NA,co2fluxclean)
 #Compare cleaned vs. uncleaned
 ggplot(data = df)+geom_hline(yintercept = 0)+
   geom_point(aes(TIMESTAMP,co2_flux),col='red')+
@@ -510,18 +689,18 @@ flag4_idx <- which(is.na(df$co2_flux.c) & !is.na(co2fluxclean) & !(df$co2_flux.f
 df$co2_flux.flag[flag4_idx] <- 4
 
 # Convert to factor with **all expected levels**
-df$co2_flux.flag <- factor(df$co2_flux.flag, levels = c(0,1,2,3,4))
+#df$co2_flux.flag <- factor(df$co2_flux.flag, levels = c(0,1,2,3,4))
 
 # Check
 summary(df$co2_flux.flag)
 
 # Color map
-color_map = c("0" = "yellow3", "1" = "darkblue", "2" = "red4", "3" = "pink3", "4" = "green4")
+color_map = c("0" = "yellow3", "1" = "darkblue", "2" = "red4", "3" = "pink3", "4" = "green4", "5" = "purple")
 
 # Plot with flags
 ggplot(df) +
   geom_hline(yintercept = 0) +
-  geom_point(aes(TIMESTAMP, co2_flux, color = co2_flux.flag)) +
+  geom_point(aes(TIMESTAMP, co2_flux, color = factor(co2_flux.flag))) +
   # Uncomment if you want to overlay cleaned flux
   # geom_point(aes(TIMESTAMP, co2_flux.c), col='black') +
   scale_y_continuous(limits=c(-20,20)) +
@@ -548,13 +727,13 @@ ggplot(data = df)+geom_hline(yintercept = 0)+
  scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))
 
 ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,co2_flux,color = co2_flux.flag))+
+  geom_point(aes(TIMESTAMP,co2_flux,color = factor(co2_flux.flag)))+
   scale_y_continuous(limits=c(-12,8))+
   scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
 scale_color_manual(values = color_map, name = "QC CO2 Flux")  
  
  ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,co2_flux,color = co2_flux.flag))+
+  geom_point(aes(TIMESTAMP,co2_flux,color = factor(co2_flux.flag)))+
   geom_point(aes(TIMESTAMP,co2_flux.c),col='black')+
   scale_y_continuous(limits=c(-12,8))+
   #scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
@@ -632,16 +811,16 @@ df$ch4_flux.flag[is.na(df$ch4_flux.c) & !is.na(ch4fluxclean) &
                  df$ch4_flux.flag != 2 & df$ch4_flux.flag != 3] <- 4
 
 # Convert to factor for plotting
-df$ch4_flux.flag <- factor(df$ch4_flux.flag, levels = c(0,1,2,3,4))
+#df$ch4_flux.flag <- factor(df$ch4_flux.flag, levels = c(0,1,2,3,4))
 
 # Define color map
 color_map <- c("0" = "yellow3", "1" = "darkblue", "2" = "red4", 
-               "3" = "pink3", "4" = "green4")
+               "3" = "pink3", "4" = "green4", "5" = "purple")
 
 # --- Plot 1: colored by flag, NAs removed ---
 ggplot(data = df[!is.na(df$ch4_flux) & !is.na(df$ch4_flux.flag), ]) +
   geom_hline(yintercept = 0) +
-  geom_point(aes(TIMESTAMP, ch4_flux, color = ch4_flux.flag)) +
+  geom_point(aes(TIMESTAMP, ch4_flux, color = factor(ch4_flux.flag))) +
   scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F")) +
   scale_color_manual(values = color_map, name = "QC CH4 Flux")
 
@@ -650,7 +829,7 @@ ggplot() +
   geom_hline(yintercept = 0) +
   # colored points for flagged flux
   geom_point(data = df[!is.na(df$ch4_flux) & !is.na(df$ch4_flux.flag), ],
-             aes(TIMESTAMP, ch4_flux, color = ch4_flux.flag)) +
+             aes(TIMESTAMP, ch4_flux, color = factor(ch4_flux.flag))) +
   # black points for cleaned flux
   geom_point(data = df[!is.na(df$ch4_flux.c), ],
              aes(TIMESTAMP, ch4_flux.c), col = 'black') +
@@ -763,7 +942,7 @@ ggplot() +
 # --- Plot 3: colored by processed flag only, NA-safe ---
 ggplot(data = df[!is.na(df$ch4_flux) & !is.na(df$ch4_flux.flag), ]) +
   geom_hline(yintercept = 0) +
-  geom_point(aes(TIMESTAMP, ch4_flux, color = ch4_flux.flag)) +
+  geom_point(aes(TIMESTAMP, ch4_flux, color =factor (ch4_flux.flag))) +
   scale_y_continuous(limits = c(-0.2, 0.2)) +
   scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F")) +
   scale_color_manual(values = color_map, name = "QC CH4 Flux")  
@@ -772,7 +951,7 @@ ggplot(data = df[!is.na(df$ch4_flux) & !is.na(df$ch4_flux.flag), ]) +
 ggplot() +
   geom_hline(yintercept = 0) +
   geom_point(data = df[!is.na(df$ch4_flux) & !is.na(df$ch4_flux.flag), ],
-             aes(TIMESTAMP, ch4_flux, color = ch4_flux.flag)) +
+             aes(TIMESTAMP, ch4_flux, color = factor (ch4_flux.flag))) +
   geom_point(data = df[!is.na(df$ch4_flux.c), ],
              aes(TIMESTAMP, ch4_flux.c), col = 'black') +
   scale_y_continuous(limits = c(-0.2, 0.2)) +
@@ -845,16 +1024,16 @@ Add flag data
 
 # --- Assign flag 4 for rolling/MAD cleaned points (NA-safe) ---
 df$H.flag[df$H.flag != 2 & df$H.flag != 3 & is.na(df$H.c) & !is.na(Hclean)] <- 4
-df$H.flag <- factor(df$H.flag, levels = c(0,1,2,3,4))
+#df$H.flag <- factor(df$H.flag, levels = c(0,1,2,3,4))
 summary(df$H.flag)
 
 # Color map
-color_map = c("0" = "yellow3", "1" = "darkblue", "2" = "red4", "3" = "pink3", "4" = "green4")
+color_map = c("0" = "yellow3", "1" = "darkblue", "2" = "red4", "3" = "pink3", "4" = "green4","5" = "purple")
 
 # --- Plot 1: H flux colored by flag (NA removed) ---
 ggplot(data = df[!is.na(df$H) & !is.na(df$H.flag), ]) +
   geom_hline(yintercept = 0) +
-  geom_point(aes(TIMESTAMP, H, color = H.flag)) +
+  geom_point(aes(TIMESTAMP, H, color = factor (H.flag))) +
   scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F")) +
   scale_color_manual(values = color_map, name = "QC H Flux")
 
@@ -862,7 +1041,7 @@ ggplot(data = df[!is.na(df$H) & !is.na(df$H.flag), ]) +
 ggplot() +
   geom_hline(yintercept = 0) +
   geom_point(data = df[!is.na(df$H) & !is.na(df$H.flag), ],
-             aes(TIMESTAMP, H, color = H.flag)) +
+             aes(TIMESTAMP, H, color = factor (H.flag))) +
   geom_point(data = df[!is.na(df$H.c), ],
              aes(TIMESTAMP, H.c), col = 'black') +
   scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F")) +
@@ -889,15 +1068,15 @@ ggplot(data = df)+geom_hline(yintercept = 0)+
   scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))
 
 ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,H,color = H.flag))+
+  geom_point(aes(TIMESTAMP,H,color = factor (H.flag)))+
   scale_y_continuous(limits=c(-100,200))+
   scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
   scale_color_manual(values = color_map, name = "QC H Flux")
 
 ggplot(data = df)+geom_hline(yintercept = 0)+
-  geom_point(aes(TIMESTAMP,H,color = H.flag))+
+  geom_point(aes(TIMESTAMP,H,color = factor (H.flag)))+
   geom_point(aes(TIMESTAMP,H.c),col='black')+
-  scale_y_continuous(limits=c(-100,200))+
+  scale_y_continuous(limits=c(-200,300))+
   #scale_x_datetime(limits = as.POSIXct(flux_dates,format="%F"))+
   scale_color_manual(values = color_map, name = "QC H Flux")
 # scale_x_datetime(limits = as.POSIXct(c("2026-04-13","2026-04-17")))
@@ -968,16 +1147,16 @@ Add flag data
 
 # --- Assign flag 4 for rolling/MAD cleaned points (NA-safe) ---
 df$LE.flag[df$LE.flag != 2 & df$LE.flag != 3 & is.na(df$LE.c) & !is.na(co2fluxclean)] <- 4
-df$LE.flag <- factor(df$LE.flag, levels = c(0,1,2,3,4))
+#df$LE.flag <- factor(df$LE.flag, levels = c(0,1,2,3,4))
 summary(df$LE.flag)
 
 # Color map
-color_map = c("0" = "yellow3", "1" = "darkblue", "2" = "red4", "3" = "pink3", "4" = "green4")
+color_map = c("0" = "yellow3", "1" = "darkblue", "2" = "red4", "3" = "pink3", "4" = "green4", "5" ="purple")
 
 # --- Plot 1: LE flux colored by flag (NA removed) ---
 ggplot(data = df[!is.na(df$LE) & !is.na(df$LE.flag), ]) +
   geom_hline(yintercept = 0) +
-  geom_point(aes(TIMESTAMP, LE, color = LE.flag)) +
+  geom_point(aes(TIMESTAMP, LE, color = factor (LE.flag))) +
   scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F")) +
   scale_color_manual(values = color_map, name = "QC LE Flux")
 
@@ -985,7 +1164,7 @@ ggplot(data = df[!is.na(df$LE) & !is.na(df$LE.flag), ]) +
 ggplot() +
   geom_hline(yintercept = 0) +
   geom_point(data = df[!is.na(df$LE) & !is.na(df$LE.flag), ],
-             aes(TIMESTAMP, LE, color = LE.flag)) +
+             aes(TIMESTAMP, LE, color = factor (LE.flag))) +
   geom_point(data = df[!is.na(df$LE.c), ],
              aes(TIMESTAMP, LE.c), col = 'black') +
   scale_x_datetime(limits = as.POSIXct(flux_dates, format="%F")) +
@@ -1105,34 +1284,47 @@ ggplot(data = diel)+geom_hline(yintercept = 0)+
 df <- df[!duplicated(df$TIMESTAMP), ]
 df$TIMESTAMP <- format(as.POSIXct(df$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
 df$ts = format(as.POSIXct(df$ts), format ="%Y-%m-%d %H:%M")
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/toolik_flux_c_met_c_tms_2025_2026.csv',row.names = F,quote = F)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/toolik_flux_c_met_c_tms_202603_202607.csv',row.names = F,quote = F)
 ```
 
 #NEST AND SPLIT THE DATA BY MONTH AND SAVE IN DESIRED DIRECTORY
 ```{r, warning=FALSE}
 
-base_path = "C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux/"
+base_path = "C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux/2025/"
 
-# Nest the data and prepare for saving
+# Make sure output folder exists
+if (!dir.exists(base_path)) {
+  dir.create(base_path, recursive = TRUE)
+}
+
+# Prepare year-month
 data_nested = df %>%
-  mutate(TIMESTAMP = as.POSIXct(TIMESTAMP, format = "%Y-%m-%d %H:%M:%S")) %>%
-  mutate(year_month = format(TIMESTAMP, "%Y%m")) %>%
-  group_by(year_month) %>%
-  nest() %>%
-  ungroup() %>%  # Important to prevent errors with grouped data
-  mutate(file_path = paste0(base_path, year_month, ".csv"))
+  mutate(
+    # Convert whatever timestamp is currently present to POSIXct
+    TIMESTAMP = as.POSIXct(TIMESTAMP, tz = "UTC"),
 
-# Write each nested data frame to the specified file path
+    # FORCE timestamp to character so midnight is written as 00:00
+    TIMESTAMP = format(TIMESTAMP, "%Y-%m-%d %H:%M", tz = "UTC"),
+
+    year_month = substr(TIMESTAMP, 1, 4) %>%
+      paste0(substr(TIMESTAMP, 6, 7))
+  ) %>%
+  dplyr::filter(!is.na(TIMESTAMP)) %>%
+  group_by(year_month) %>%
+  tidyr::nest() %>%
+  ungroup() %>%
+  mutate(
+    file_path = paste0(base_path, year_month, "_C.csv")
+  )
+
+
+# Write each month
 walk2(
-  .x = data_nested$data, 
-  .y = data_nested$file_path, 
-  ~ {
-    # Ensure the nested data frame has columns as character if needed
-    .x[] <- lapply(.x, as.character)  # Convert all columns to character, if needed
-    
-    # Write to CSV without adding the units row
-    write.csv(.x, .y, row.names = FALSE)
-  }
+  data_nested$data,
+  data_nested$file_path,
+  ~ write.csv(.x, .y, row.names = FALSE, na = "NA")
 )
+
+
 
 ```

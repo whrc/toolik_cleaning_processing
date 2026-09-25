@@ -17,7 +17,7 @@ library(tidyr)
 ####################################################################
 
 #load in the full output flux data ##################
-fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/first_annual'
+fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/2026/7500'
 #fp = 'C:/Users/klynoe/Documents/pond_inlet/202410_full/eddypro/full_output/2024'
 files = list.files(path = fp,pattern = '*full_output.+csv$',recursive = T,full.names = T)
 
@@ -59,9 +59,11 @@ ts = as.data.frame(ts)
 #merge with the flux data frame to create NAs where data is missing
 df = merge(ts,df,by = 'ts',all.x = T)
 
+df$ts <- format(
+  as.POSIXct(df$ts, tz = "UTC"),"%Y-%m-%d %H:%M")
 
 #save off flux data
-write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202607.csv',row.names = F)
+write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_7500_202603_202607.csv',row.names = F)
 
 
 ################multiple met
@@ -90,8 +92,8 @@ df_master$TIMESTAMP <- as.POSIXct(df_master$TIMESTAMP, tz = "UTC")
 df_master <- unique(df_master, by = "TIMESTAMP")
 
 # 6. Generate a continuous 30-minute time grid starting from your specific date
-start_date <- as.POSIXct("2025-05-06 09:30:00", tz = "UTC")
-stop_date = as.POSIXct("2026-07-30 23:30:00", tz = "UTC")
+start_date <- as.POSIXct("2026-01-01 00:00:00", tz = "UTC")
+stop_date = as.POSIXct("2026-07-31 23:30:00", tz = "UTC")
 ts_grid <- data.frame(TIMESTAMP = seq(
   from = start_date,
   to = stop_date,
@@ -102,7 +104,7 @@ ts_grid <- data.frame(TIMESTAMP = seq(
 df_master <- merge(ts_grid, df_master, by = "TIMESTAMP", all.x = TRUE)
 ###########################
 
-write.csv(df_master,'C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik_met_202505_202607.csv',row.names = F)
+write.csv(df_master,'C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik_met_202603_202607.csv',row.names = F)
 ###########
 
 ###MERGE FLUX AND MET!!!!!!##########
@@ -190,33 +192,131 @@ setDT(tomst_wide)
 flux_biomet_tms <- merge(DF_1, tomst_wide, by = "TIMESTAMP", all = TRUE)
 
 
-# 1. Ensure it is a data.table
+### ============================================================
+# CLEAN MASTER BIOMET DATA
+# ============================================================
+
 setDT(flux_biomet_tms)
 
-# 2. Get names of columns to process (skipping TIMESTAMP)
-clean_cols <- setdiff(names(flux_biomet_tms), "TIMESTAMP")
+# ------------------------------------------------------------
+# MAKE SURE TIMESTAMP IS POSIXct
+# ------------------------------------------------------------
 
-# 3. Fast clean loop across all columns
+flux_biomet_tms[, TIMESTAMP := as.POSIXct(
+  TIMESTAMP,
+  tz = "UTC"
+)]
+
+# ------------------------------------------------------------
+# 2026 DATE RANGE
+# ------------------------------------------------------------
+
+start_date <- as.POSIXct(
+  "2026-03-01 00:00:00",
+  tz = "UTC"
+)
+
+# Find last timestamp with data in 2026
+last_timestamp <- max(
+  flux_biomet_tms$TIMESTAMP[
+    flux_biomet_tms$TIMESTAMP >= start_date
+  ],
+  na.rm = TRUE
+)
+
+# Start of the last month with data
+last_month_start <- as.POSIXct(
+  format(last_timestamp, "%Y-%m-01 00:00:00"),
+  tz = "UTC"
+)
+
+# End of the last month with data
+next_month <- seq(
+  last_month_start,
+  by = "month",
+  length.out = 2
+)[2]
+
+stop_date <- next_month - 30 * 60
+
+
+# ------------------------------------------------------------
+# CLEAN BAD VALUES
+# ------------------------------------------------------------
+
+clean_cols <- setdiff(
+  names(flux_biomet_tms),
+  "TIMESTAMP"
+)
+
 for (col in clean_cols) {
-  # Fix standard bad values
-  set(flux_biomet_tms, i = which(flux_biomet_tms[[col]] == -9999), j = col, value = NA)
-  set(flux_biomet_tms, i = which(flux_biomet_tms[[col]] == -7999), j = col, value = NA)
   
-  # Catch hidden NaNs or Infinite spikes in numeric columns
   if (is.numeric(flux_biomet_tms[[col]])) {
-    set(flux_biomet_tms, i = which(is.nan(flux_biomet_tms[[col]])), j = col, value = NA)
-    set(flux_biomet_tms, i = which(is.infinite(flux_biomet_tms[[col]])), j = col, value = NA)
+    
+    set(
+      flux_biomet_tms,
+      i = which(flux_biomet_tms[[col]] == -9999),
+      j = col,
+      value = NA
+    )
+    
+    set(
+      flux_biomet_tms,
+      i = which(flux_biomet_tms[[col]] == -7999),
+      j = col,
+      value = NA
+    )
+    
+    set(
+      flux_biomet_tms,
+      i = which(is.nan(flux_biomet_tms[[col]])),
+      j = col,
+      value = NA
+    )
+    
+    set(
+      flux_biomet_tms,
+      i = which(is.infinite(flux_biomet_tms[[col]])),
+      j = col,
+      value = NA
+    )
   }
 }
 
-flux_biomet_tms$TIMESTAMP = flux_biomet_tms$ts
+
+# ------------------------------------------------------------
+# CREATE COMPLETE 30-MINUTE TIME GRID
+# ------------------------------------------------------------
+
+full_time <- data.table(
+  TIMESTAMP = seq(
+    from = start_date,
+    to = stop_date,
+    by = "30 mins"
+  )
+)
+# ------------------------------------------------------------
+# MERGE ORIGINAL DATA ONTO FULL GRID
+# ------------------------------------------------------------
+
+flux_biomet_tms <- merge(
+  full_time,
+  flux_biomet_tms,
+  by = "TIMESTAMP",
+  all.x = TRUE
+)
+
+setorder(
+  flux_biomet_tms,
+  TIMESTAMP
+)
 ############
 ##SAVE!!!###
-flux_biomet_tms$ts <- format(as.POSIXct(flux_biomet_tms$ts), format ="%Y-%m-%d %H:%M:%S" )
-flux_biomet_tms$TIMESTAMP <- format(as.POSIXct(flux_biomet_tms$TIMESTAMP), format ="%Y-%m-%d %H:%M:%S" )
+#flux_biomet_tms$ts <- format(as.POSIXct(flux_biomet_tms$ts), format ="%Y-%m-%d %H:%M:%S" )
+#flux_biomet_tms$TIMESTAMP <- format(as.POSIXct(flux_biomet_tms$TIMESTAMP), format ="%Y-%m-%d %H:%M:%S" )
 write.csv(
   flux_biomet_tms,
-  "C:/Users/klynoe/Documents/toolik/R_outputs/GTH89_flux_biomet_tms_combined_2025_2026.csv"
+  "C:/Users/klynoe/Documents/toolik/R_outputs/GTH89_flux_biomet_tms_combined_202603_202607.csv"
   , row.names = F)
 
 ################################
