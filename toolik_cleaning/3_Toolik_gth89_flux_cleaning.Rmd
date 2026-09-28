@@ -226,7 +226,7 @@ Cut the crazy data and create new variable (Tau.limits)
 ```{r, warning=FALSE}
 
 Tau.limits = df$Tau
-Tau.limits = replace(df$Tau,df$Tau < -1 | df$Tau > .2,NA)
+Tau.limits = replace(df$Tau,df$Tau < -0.8 | df$Tau > .2,NA)
 
 plot(Tau.limits)
 
@@ -235,15 +235,25 @@ plot(Tau.limits)
 # Diagnostics Cleaning
 Clean some data based on instrument diagnostics
 ```{r}
+signal_cutoff <- as.POSIXct(
+  "2026-04-27 12:00:00",
+  tz = "UTC"
+)
+
 signal.threshold.co2 <- ifelse(
-  df$sig_strength_7500_mean >= 75, 0, 1 #for 7200 when installed in may 2026
+  df$TIMESTAMP < signal_cutoff,
+  ifelse(df$signal_mean >= 75, 0, 1),
+  ifelse(df$sig_strength_7500_mean >= 75, 0, 1)
 )
 
 #signal.threshold.co2 <- ifelse(
 #  df$co2_signal_strength_7200_mean >= 75, 0, 1 #for 7200 when installed in may 2026
 #)
+
 signal.threshold.h2o <- ifelse(
-  df$sig_strength_7500_mean >= 75, 0, 1
+  df$TIMESTAMP < signal_cutoff,
+  ifelse(df$signal_mean >= 75, 0, 1),
+  ifelse(df$sig_strength_7500_mean >= 75, 0, 1)
 )
 
 #signal.threshold.h2o <- ifelse(
@@ -251,7 +261,9 @@ signal.threshold.h2o <- ifelse(
 #)
 
 signal.threshold.ch4 <- ifelse(
-  df$rssi_7700_mean >= 10, 0, 1
+  df$TIMESTAMP < signal_cutoff,
+  ifelse(df$rssi_mean >= 10, 0, 1),
+  ifelse(df$rssi_7700_mean >= 10, 0, 1)
 )
 
 
@@ -268,21 +280,25 @@ ggplot(data = df)+
   scale_y_continuous(limits = c(-200,500))
 
 
-co2_flux.qc <- replace(                          #CHANGING THIS FROM .SS TO .QC FOR ALL VARIABLES
+# ============================================================
+# APPLY SIGNAL QC
+# ============================================================
+
+co2_flux.qc <- replace(
   co2_flux.qc,
-  df$signal_mean <= 75,
+  signal.threshold.co2 == 1,
   NA
 )
 
 ch4_flux.qc <- replace(
   ch4_flux.qc,
-  df$rssi_mean <= 10,
+  signal.threshold.ch4 == 1,
   NA
 )
 
 LE.qc <- replace(
   LE.qc,
-  df$signal_mean <= 75,
+  signal.threshold.h2o == 1,
   NA
 )
 
@@ -364,7 +380,7 @@ Plot NEE Histogram and what we might clean
 hist(co2_flux.qc,breaks=100)
 
 #
-plot(df$ts,co2_flux.qc,ylim = c(-25,25));abline(h=20, col= 'red');abline(h=-20, col='red')
+plot(df$ts,co2_flux.qc,ylim = c(-50,50));abline(h=20, col= 'red');abline(h=-20, col='red')
 
 # 
 plot(df$ts,co2_flux.qc,ylim = c(-25,25));abline(h=15, col= 'red');abline(h=-15, col='red')
@@ -374,10 +390,14 @@ Clean based on graphs, create new variable (co2_flux.limits), and see cleaned pr
 
 ```{r, warning=FALSE}
 
-co2_flux.limits = replace(df$co2_flux,(df$co2_flux > 20 | df$co2_flux < -20) & df$TIMESTAMP >= '2025-05-01' | (df$co2_flux > 20 | df$co2_flux < -20),NA)
+co2_flux.limits = replace(
+  df$co2_flux,
+  df$co2_flux > 20 | df$co2_flux < -20,
+  NA
+)
 
-upper_limit <- 20
-lower_limit <- -20
+upper_limit <- 16
+lower_limit <- -16
 
 limit_fail <- df$co2_flux > upper_limit | df$co2_flux < lower_limit
 
@@ -515,7 +535,7 @@ Clean based on graphs, create new variable (H.limits), and see cleaned product
 ```{r, warning=FALSE}
 # Define absolute limits - these will vary greatly depending on time of year
 H_upper <- 250 #did 100 for 7200 not as high
-H_lower <- -180
+H_lower <- -150
 
 # Create a "limited" vector for plotting and filtering
 H.limits <- df$H
@@ -657,7 +677,7 @@ now filter the data based on this signal
 #  ifelse(abs(co2fluxclean - Flux_filt) > (N.summer * roll.mad),NA,co2fluxclean),
  #   ifelse(abs(co2fluxclean - Flux_filt) > (N.winter * roll.mad),NA,co2fluxclean)
 #)
-N = 5
+N = 4
 
 #Add clean value to dataframe (_.c)
 
@@ -666,7 +686,7 @@ df$co2_flux.c = ifelse(abs(co2fluxclean - Flux_filt) > (N * roll.mad),NA,co2flux
 ggplot(data = df)+geom_hline(yintercept = 0)+
   geom_point(aes(TIMESTAMP,co2_flux),col='red')+
   geom_point(aes(TIMESTAMP,co2_flux.c),col='black')+
-  scale_y_continuous(limits=c(-15,15))
+  scale_y_continuous(limits=c(-22,22))
   #scale_x_datetime(limits = as.POSIXct(c("2026-04-13","2026-04-17")))
 ```
 
@@ -994,7 +1014,7 @@ ggplot(df)+geom_hline(yintercept = 0)+
 Now filter the data based on this signal (N) adjust this to tweak how many MADs to be away from the norm, add clean value to dataframe (_.c) and Compare Clean vs. Uncleaned
 
 ```{r, warning=FALSE}
-N = 3
+N = 4
 
 df$H.c = ifelse(abs(Hclean - Flux_filt) > (N * roll.mad),NA,Hclean)
 
@@ -1117,7 +1137,7 @@ ggplot(df)+geom_hline(yintercept = 0)+
 Now filter the data based on this signal (N) adjust this to tweak how many MADs to be away from the norm
 
 ```{r, warning=FALSE}
-N = 6
+N = 5
 
 df$LE.c = ifelse(abs(LEclean - Flux_filt) > (N * roll.mad),NA,LEclean)
 
@@ -1290,7 +1310,7 @@ write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/t
 #NEST AND SPLIT THE DATA BY MONTH AND SAVE IN DESIRED DIRECTORY
 ```{r, warning=FALSE}
 
-base_path = "C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux/2025/"
+base_path = "C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux/2026/"
 
 # Make sure output folder exists
 if (!dir.exists(base_path)) {

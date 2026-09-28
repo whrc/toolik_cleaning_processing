@@ -1,0 +1,513 @@
+---
+title: "slump_biomet"
+author: "Kaj"
+date: "2026-09-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, warning=FALSE}
+rm(list = ls())
+Sys.setenv(TZ = "UTC")
+knitr::opts_chunk$set(error = TRUE)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = 'C:/Users/klynoe/Documents/toolik/R_outputs') #use this to set your directory
+
+library(data.table)
+library(ggplot2)
+library(cowplot)
+library(openair)
+library(plotrix)
+library(signal)
+library(svMisc)
+library(zoo)
+library(stringr)
+library(plyr)
+library(dplyr)
+
+```
+
+```{r, warning=FALSE}
+
+df = read.csv("C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik_slump_met_202607_202609.csv",)
+
+
+df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
+
+df[df == -9999] <- NA
+df[df == -7999] <- NA
+
+
+# Create a complete sequence of timestamps at 30-minute intervals
+tsdf <- data.frame(TIMESTAMP = seq(
+  from = min(df$TIMESTAMP),
+  to = max(df$TIMESTAMP),
+  by = 60*30
+))
+
+
+df = merge(tsdf,df,by = 'TIMESTAMP',all.x = T)
+
+head(df)
+```
+
+###FIX INITIAL SENSOR NAME CHANGES#####
+
+```{r, echo=FALSE}
+
+# ------------------------------------------------------------
+# 2026-07-29 through 2026-08-05
+# ------------------------------------------------------------
+
+i1 <- df$TIMESTAMP >= as.POSIXct("2026-07-29 00:00:00", tz = "UTC") &
+      df$TIMESTAMP <  as.POSIXct("2026-08-05 00:00:00", tz = "UTC")
+
+# Save old columns first
+swc1 <- df$SWC_12_36_1_1_1
+swc2 <- df$SWC_12_36_2_1_1
+swc3 <- df$SWC_12_36_3_1_1
+
+ts1  <- df$TS_2_38_1_1_1
+ts23 <- df$TS_2_38_23_1_1
+ts2  <- df$TS_2_38_2_1_1
+
+df$SWC_12_36_2_1_1[i1] <- swc1[i1]
+df$SWC_12_36_3_1_1[i1] <- swc2[i1]
+df$SWC_12_36_4_1_1[i1] <- swc3[i1]
+
+df$TS_2_38_2_1_1[i1] <- ts1[i1]
+df$TS_2_38_3_1_1[i1] <- ts23[i1]
+df$TS_2_38_4_1_1[i1] <- ts2[i1]
+
+
+# ------------------------------------------------------------
+# 2026-08-05 through 2026-08-25
+# ------------------------------------------------------------
+
+i2 <- df$TIMESTAMP >= as.POSIXct("2026-08-05 00:00:00", tz = "UTC") &
+      df$TIMESTAMP <  as.POSIXct("2026-08-25 00:00:00", tz = "UTC")
+
+ts5 <- df$TS_2_38_5_1_1
+ts6 <- df$TS_2_38_6_1_1
+ts7 <- df$TS_2_38_7_1_1
+
+df$TS_2_38_2_1_1[i2] <- ts5[i2]
+df$TS_2_38_3_1_1[i2] <- ts6[i2]
+df$TS_2_38_4_1_1[i2] <- ts7[i2]
+
+# 3_1:6 -> 6_1:6
+for (j in 1:6) {
+  old <- paste0("TS_2_38_3_", j, "_1")
+  new <- paste0("TS_2_38_6_", j, "_1")
+  x <- df[[old]]
+  df[[new]][i2] <- x[i2]
+}
+
+# 4_1:6 -> 7_1:6
+for (j in 1:6) {
+  old <- paste0("TS_2_38_4_", j, "_1")
+  new <- paste0("TS_2_38_7_", j, "_1")
+  x <- df[[old]]
+  df[[new]][i2] <- x[i2]
+}
+
+
+# ------------------------------------------------------------
+# Remove obsolete historical names
+# ------------------------------------------------------------
+old_cols <- c(
+  "SWC_12_36_1_1_1",
+  "TS_2_38_1_1_1",
+  "TS_2_38_23_1_1",
+  "TS_2_38_5_1_1",
+  paste0("TS_2_38_3_", 7:12, "_1"),
+  paste0("TS_2_38_4_", 7:12, "_1")
+)
+
+df <- df[, !names(df) %in% old_cols]
+
+```
+
+
+```{r, echo=F}
+biomet_dates = c('2026-07-20', '2026-09-30')
+```
+#SLUMP HEAT FLUX COMBINED
+
+```{r, echo=F}
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, SHF_6_37_3_1_1, col = "Bare soil")) +
+  geom_point(aes(TIMESTAMP, SHF_6_37_4_1_1, col = "Floating veg")) +
+  geom_point(aes(TIMESTAMP, SHF_6_37_5_1_1, col = "Dense veg")) +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(
+    expression("Soil Heat Flux ("*W/m^2*")")
+  ) +
+  scale_color_manual(
+    values = c(
+      "Bare soil" = "red",
+      "Floating veg" = "blue",
+      "Dense veg" = "green"
+    )
+  ) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  theme_bw()
+
+```
+
+
+# SHF individual plots
+```{r, echo=F}
+ggplot(df) +
+   geom_point(aes(TIMESTAMP, SHF_6_37_3_1_1), colour = "red") +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(
+    expression("Soil Heat Flux ("*W/m^2*")")
+  ) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("SHF 3 - Bare soil") +
+  theme_bw()
+
+ggplot(df) +
+  geom_point(aes(TIMESTAMP, SHF_6_37_4_1_1), colour = "blue") +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(
+    expression("Soil Heat Flux ("*W/m^2*")")
+  ) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("SHF 4 - Floating vegetation") +
+  theme_bw()
+
+ggplot(df) +
+ geom_point(aes(TIMESTAMP, SHF_6_37_5_1_1), colour = "green") +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(
+    expression("Soil Heat Flux ("*W/m^2*")")
+  ) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("SHF 5 - Dense vegetation") +
+  theme_bw()
+
+
+```
+
+#SWC COMBINED
+
+```{r, echo=F}
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, SWC_12_36_2_1_1 * 100,
+                 col = "Bare soil - 10 cm")) +
+  geom_point(aes(TIMESTAMP, SWC_12_36_3_1_1 * 100,
+                 col = "Floating veg - 10 cm")) +
+  geom_point(aes(TIMESTAMP, SWC_12_36_4_1_1 * 100,
+                 col = "Dense veg - 10 cm")) +
+  scale_y_continuous(
+    limits = c(0, 100),
+    expression("% VWC")
+  ) +
+  scale_color_manual(
+    values = c(
+      "Bare soil - 10 cm" = "red",
+      "Floating veg - 10 cm" = "blue",
+      "Dense veg - 10 cm" = "green"
+    ))+
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  theme_bw()
+
+```
+
+
+# INDIVIDUAL SWC 
+```{r, echo=F}
+
+ggplot(df) +
+  geom_point(aes(TIMESTAMP, SWC_12_36_2_1_1 * 100), colour = "red") +
+  scale_y_continuous(
+    limits = c(0, 100),
+    expression("% VWC")
+  ) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("SWC 2 - Bare soil - 10 cm") +
+  theme_bw()
+
+ggplot(df) +
+  geom_point(aes(TIMESTAMP, SWC_12_36_3_1_1 * 100), colour = "blue") +
+  scale_y_continuous(
+    limits = c(0, 100),
+    expression("% VWC")
+  ) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("SWC 3 - Floating vegetation - 10 cm") +
+  theme_bw()
+
+ggplot(df) +
+  geom_point(aes(TIMESTAMP, SWC_12_36_4_1_1 * 100), colour = "green") +
+  scale_y_continuous(
+    limits = c(0, 100),
+    expression("% VWC")
+  ) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("SWC 4 - Dense vegetation - 10 cm") +
+  theme_bw()
+
+```
+
+#SOIL TEMPERATURES COMBINED
+```{r, echo=F}
+
+ggplot(data = df) +
+  geom_line(aes(TIMESTAMP, TS_2_38_2_1_1,
+                col = "Bare soil - 10 cm")) +
+  geom_line(aes(TIMESTAMP, TS_2_38_3_1_1,
+                col = "Floating veg - 10 cm")) +
+  geom_line(aes(TIMESTAMP, TS_2_38_4_1_1,
+                col = "Dense veg - 10 cm")) +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(
+    limits = c(-5, 15),
+    expression("Soil T ("*degree*C*")")
+  ) +
+  scale_color_manual(
+    values = c(
+      "Bare soil - 10 cm" = "red",
+      "Floating veg - 10 cm" = "blue",
+      "Dense veg - 10 cm" = "green"
+    ))+
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  theme_bw()
+
+```
+
+# INDIVIDUAL SOIL TEMPERATURES 
+
+```{r, echo=F}
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_2_1_1), colour = "red") +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(
+    limits = c(-5, 20),
+    expression("Soil T ("*degree*C*")")
+  ) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Bare soil - 10 cm") +
+  theme_bw()
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_3_1_1),colour = "blue") +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(
+    limits = c(-5, 15),
+    expression("Soil T ("*degree*C*")")
+  ) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Floating vegetation - 10 cm") +
+  theme_bw()
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_4_1_1),colour = "green") +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(
+    limits = c(-5, 15),
+    expression("Soil T ("*degree*C*")")
+  ) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Dense vegetation - 10 cm") +
+  theme_bw()
+
+```
+
+
+# SOIL TEMP PROFILES 5 - 50 CM BARE SOIL COMBINED
+```{r, echo=F}
+
+ggplot(data = df) +
+  geom_line(aes(TIMESTAMP, TS_2_38_6_1_1, col = "5 cm")) +
+  geom_line(aes(TIMESTAMP, TS_2_38_6_2_1, col = "10 cm")) +
+  geom_line(aes(TIMESTAMP, TS_2_38_6_3_1, col = "20 cm")) +
+  geom_line(aes(TIMESTAMP, TS_2_38_6_4_1, col = "30 cm")) +
+  geom_line(aes(TIMESTAMP, TS_2_38_6_5_1, col = "40 cm")) +
+  geom_line(aes(TIMESTAMP, TS_2_38_6_6_1, col = "50 cm")) +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(
+    limits = c(-5, 15),
+    expression("Soil T ("*degree*C*")")
+  ) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Bare soil profile 5 - 50 cm")+
+  theme_bw()
+
+```
+
+# INDIVIDUAL SOIL PROFILES - BARE SOIL
+
+```{r, echo=F}
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_6_1_1)) +
+  scale_y_continuous(limits = c(-5, 15),
+                     expression("Soil T ("*degree*C*")")) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Bare Soil - 5 cm") +
+  theme_bw()
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_6_2_1)) +
+  scale_y_continuous(limits = c(-5, 15),
+                     expression("Soil T ("*degree*C*")")) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Bare Soil - 10 cm") +
+  theme_bw()
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_6_3_1)) +
+  scale_y_continuous(limits = c(-5, 15),
+                     expression("Soil T ("*degree*C*")")) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Bare Soil - 20 cm") +
+  theme_bw()
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_6_4_1)) +
+  scale_y_continuous(limits = c(-5, 15),
+                     expression("Soil T ("*degree*C*")")) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Bare Soil - 30 cm") +
+  theme_bw()
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_6_5_1)) +
+  scale_y_continuous(limits = c(-5, 15),
+                     expression("Soil T ("*degree*C*")")) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Bare Soil - 40 cm") +
+  theme_bw()
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_6_6_1)) +
+  scale_y_continuous(limits = c(-5, 15),
+                     expression("Soil T ("*degree*C*")")) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Bare Soil - 50 cm") +
+  theme_bw()
+
+
+```
+
+#SOIL TEMP PROFILES DENSE VEG. 5-50 CM COMBINED
+
+```{r, echo=F}
+
+ggplot(data = df) +
+  geom_line(aes(TIMESTAMP, TS_2_38_7_1_1, col = "5 cm")) +
+  geom_line(aes(TIMESTAMP, TS_2_38_7_2_1, col = "10 cm")) +
+  geom_line(aes(TIMESTAMP, TS_2_38_7_3_1, col = "20 cm")) +
+  geom_line(aes(TIMESTAMP, TS_2_38_7_4_1, col = "30 cm")) +
+  geom_line(aes(TIMESTAMP, TS_2_38_7_5_1, col = "40 cm")) +
+  geom_line(aes(TIMESTAMP, TS_2_38_7_6_1, col = "50 cm")) +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(
+    limits = c(-5, 15),
+    expression("Soil T ("*degree*C*")")
+  ) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Dense Veg. Soil Profile 5-50 cm")+
+  theme_bw()
+
+```
+
+
+
+```{r, echo=F}
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_7_1_1)) +
+  scale_y_continuous(limits = c(-5, 15),
+                     expression("Soil T ("*degree*C*")")) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Dense Veg. - 5 cm") +
+  theme_bw()
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_7_2_1)) +
+  scale_y_continuous(limits = c(-5, 15),
+                     expression("Soil T ("*degree*C*")")) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Dense Veg.  - 10 cm") +
+  theme_bw()
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_7_3_1)) +
+  scale_y_continuous(limits = c(-5, 15),
+                     expression("Soil T ("*degree*C*")")) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Dense Veg.  - 20 cm") +
+  theme_bw()
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_7_4_1)) +
+  scale_y_continuous(limits = c(-5, 15),
+                     expression("Soil T ("*degree*C*")")) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Dense Veg. - 30 cm") +
+  theme_bw()
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_7_5_1)) +
+  scale_y_continuous(limits = c(-5, 15),
+                     expression("Soil T ("*degree*C*")")) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Dense Veg.  - 40 cm") +
+  theme_bw()
+
+ggplot(data = df) +
+  geom_point(aes(TIMESTAMP, TS_2_38_7_6_1)) +
+  scale_y_continuous(limits = c(-5, 15),
+                     expression("Soil T ("*degree*C*")")) +
+  scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
+  ggtitle("Dense Veg.  - 50 cm") +
+  theme_bw()
+
+```
+
+
+
+```{r, echo=F}
+
+
+
+```
+
+
+
+```{r, echo=F}
+
+
+
+```
+
+
+
+```{r, echo=F}
+
+
+
+```
+
+
+
+```{r, echo=F}
+
+
+
+```
+
+
+
+
+

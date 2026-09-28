@@ -321,10 +321,87 @@ write.csv(
 
 ################################
 
+#####SLUMP BIOMET#######REGULAR LOAD FOR NOW - SHOULD PROBABLY BE MERGED WITH TOWER BIOMET#####
 
 
+  # 1. Define folder path and list all SlumpBiomet files
+  fp <- "C:/Users/klynoe/Documents/toolik/raw_data/met/slump_biomet/"
 
+files <- list.files(
+  path = fp,
+  pattern = "^toolik-gth89-SlumpBiomet.*\\.dat$",
+  recursive = TRUE,
+  full.names = TRUE
+)
 
+# 2. Bulk load headers and data
+h_list <- lapply(files, fread, skip = 1, nrows = 0)
+
+dat_list <- lapply(
+  files,
+  fread,
+  skip = 4,
+  header = FALSE,
+  na.strings = c("-9999", "NA", "NaN", "NAN", "-7999")
+)
+
+# 3. Dynamically map headers to their respective datasets
+for (i in seq_along(dat_list)) {
+  names(dat_list[[i]]) <- names(h_list[[i]])
+}
+
+# 4. Bind matching columns
+df_slump <- rbindlist(
+  dat_list,
+  use.names = TRUE,
+  fill = TRUE
+)
+
+# 5. Clean timestamps and drop duplicate rows
+df_slump$TIMESTAMP <- as.POSIXct(
+  df_slump$TIMESTAMP,
+  tz = "UTC"
+)
+
+df_slump <- unique(
+  df_slump,
+  by = "TIMESTAMP"
+)
+
+# 6. Generate continuous 30-minute time grid
+start_date <- as.POSIXct(
+  "2026-07-01 00:00:00",
+  tz = "UTC"
+)
+
+stop_date <- as.POSIXct(
+  "2026-09-30 23:30:00",
+  tz = "UTC"
+)
+
+ts_grid <- data.frame(
+  TIMESTAMP = seq(
+    from = start_date,
+    to = stop_date,
+    by = 60 * 30
+  )
+)
+
+# 7. Merge onto grid to reveal NAs where records are missing
+df_slump <- merge(
+  ts_grid,
+  df_slump,
+  by = "TIMESTAMP",
+  all.x = TRUE
+)
+
+###########################
+df_slump$TIMESTAMP <- format(as.POSIXct(df_slump$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
+write.csv(
+  df_slump,
+  "C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik_slump_met_202607_202609.csv",
+  row.names = FALSE
+)
 
 
 

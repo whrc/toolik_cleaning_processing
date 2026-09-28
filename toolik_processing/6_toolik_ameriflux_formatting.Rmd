@@ -22,8 +22,20 @@ Sys.setenv(TZ = "UTC")
 
 Load Data
 ```{r}
-df = fread(input = "toolik_flux_c_met_c_tms_2025_2026.csv")
+df1 = fread(input = "toolik_flux_c_met_c_tms_202505_202512.csv")
+df2 = fread(input = "toolik_flux_c_met_c_tms_202603_202607.csv")
 
+df = rbindlist(
+  list(df1, df2),
+  use.names = TRUE,
+  fill = TRUE
+)
+
+df$TIMESTAMP <- as.POSIXct(
+  df$TIMESTAMP,
+  format = "%Y-%m-%d %H:%M",
+  tz = "UTC"
+)
 # Subset out 2024 data (starts at end of other ameriflux file)
 
 #df$ts = df$TIMESTAMP

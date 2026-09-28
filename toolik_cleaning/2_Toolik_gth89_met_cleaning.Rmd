@@ -72,7 +72,7 @@ df = merge(df,sd,by = 'TIMESTAMP', all.x = T)
 ```
 
 ```{r, warning=FALSE}
-biomet_dates <- c('2026-03-01', '2026-07-31')
+biomet_dates <- c('2025-05-01', '2026-07-31')
 #biomet_dates <- c('2024-10-30', '2024-12-01')
 ```
 
@@ -990,8 +990,8 @@ ggplot(data = df) +
 ```{r, warning=F}
 
 # 1. Parse timestamps safely
-cutoff   <- as.POSIXct("2025-08-04 00:00:00", tz = "UTC")
-end_date <- as.POSIXct("2026-08-23 23:59:59", tz = "UTC")
+cutoff   <- as.POSIXct("2026-03-01 00:00:00", tz = "UTC")
+end_date <- as.POSIXct("2026-07-31 23:59:59", tz = "UTC")
 
 df_filtered <- df %>%
   mutate(TIMESTAMP_true = as.POSIXct(TIMESTAMP, tz = "UTC")) %>%
