@@ -301,6 +301,7 @@ walk2(
   }
 )
 
+
 #####################################
                                #ALL BIOMET#
                                 ####~~####
@@ -452,12 +453,12 @@ df_bio <- unique(
 # ============================================================
 
 start_date <- as.POSIXct(
-  "2026-03-01 00:00:00",
+  "2026-09-01 00:00:00",
   tz = "UTC"
 )
 
 stop_date <- as.POSIXct(
-  "2026-08-31 23:30:00",
+  "2026-09-30 23:30:00",
   tz = "UTC"
 )
 
@@ -612,6 +613,4 @@ met_out <- rbind(units_row, met)
 base_path = "C:/Users/klynoe/Documents/toolik/R_outputs/met/"
 
 write.csv(met_out, "toolik-gth89-AllBiomet_1.csv", row.names = FALSE)
-
-
 
