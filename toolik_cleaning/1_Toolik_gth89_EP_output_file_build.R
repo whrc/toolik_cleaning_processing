@@ -17,7 +17,7 @@ library(tidyr)
 ####################################################################
 
 #load in the full output flux data ##################
-fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/2026/7500'
+fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/2026/'
 #fp = 'C:/Users/klynoe/Documents/pond_inlet/202410_full/eddypro/full_output/2024'
 files = list.files(path = fp,pattern = '*full_output.+csv$',recursive = T,full.names = T)
 
@@ -62,38 +62,71 @@ df = merge(ts,df,by = 'ts',all.x = T)
 df$ts <- format(
   as.POSIXct(df$ts, tz = "UTC"),"%Y-%m-%d %H:%M")
 
+# Define date range
+start_date <- as.POSIXct("2026-08-01 00:00:00", tz = "UTC")
+stop_date  <- as.POSIXct("2026-09-30 23:30:00", tz = "UTC")
+
+# Filter df using ts
+df <- df[
+  as.POSIXct(df$ts, tz = "UTC") >= start_date &
+    as.POSIXct(df$ts, tz = "UTC") <= stop_date,
+]
+
+# Format timestamp
+df$ts <- format(
+  as.POSIXct(df$ts, tz = "UTC"),
+  "%Y-%m-%d %H:%M"
+)
+
+
 #save off flux data
-write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_7500_202603_202607.csv',row.names = F)
+write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202608_202609.csv',row.names = F)
 
 
 ################multiple met
 
 
 
-# 1. Define folder path and list all AllBiomet files
-fp <- "C:/Users/klynoe/Documents/toolik/raw_data/met/annual_met/"
-files <- list.files(path = fp, pattern = "toolik-gth89-AllBiomet_.+\\.dat$", recursive = TRUE, full.names = TRUE)
+# 1. Find all AllBiomet files, including the base filename
+fp <- "C:/Users/klynoe/Documents/toolik/raw_data/met/2026"
 
-# 2. Bulk load headers and data matching your specific Toolik format
+files <- list.files(
+  path = fp,
+  pattern = "^toolik-gth89-AllBiomet(_.*)?\\.dat$",
+  recursive = TRUE,
+  full.names = TRUE
+)
+
+print(files)
+
+# 2. Load headers and data
 h_list <- lapply(files, fread, skip = 1, nrows = 0)
-dat_list <- lapply(files, fread, skip = 4, header = FALSE, 
-                   na.strings = c('-9999','NA','NaN','NAN','-7999'))
 
-# 3. Dynamically map headers to their respective datasets
+dat_list <- lapply(
+  files, fread,
+  skip = 4,
+  header = FALSE,
+  na.strings = c("-9999", "NA", "NaN", "NAN", "-7999")
+)
+
+# 3. Assign headers
 for (i in seq_along(dat_list)) {
-  names(dat_list[[i]]) <- names(h_list[[i]])
+  setnames(dat_list[[i]], names(h_list[[i]]))
 }
 
-# 4. Ultra-fast bind matching by column names (fill = TRUE handles new columns)
+# 4. Combine files
 df_master <- rbindlist(dat_list, use.names = TRUE, fill = TRUE)
 
-# 5. Clean up timestamps and drop duplicate rows
-df_master$TIMESTAMP <- as.POSIXct(df_master$TIMESTAMP, tz = "UTC")
-df_master <- unique(df_master, by = "TIMESTAMP")
+# 5. Parse timestamps and check the loaded data
+df_master[, TIMESTAMP := as.POSIXct(TIMESTAMP, tz = "UTC")]
+
+print(range(df_master$TIMESTAMP, na.rm = TRUE))
+print(df_master[order(TIMESTAMP)][.N, .(TIMESTAMP)])
+
 
 # 6. Generate a continuous 30-minute time grid starting from your specific date
-start_date <- as.POSIXct("2026-01-01 00:00:00", tz = "UTC")
-stop_date = as.POSIXct("2026-07-31 23:30:00", tz = "UTC")
+start_date <- as.POSIXct("2026-08-01 00:00:00", tz = "UTC")
+stop_date = as.POSIXct("2026-09-30 23:30:00", tz = "UTC")
 ts_grid <- data.frame(TIMESTAMP = seq(
   from = start_date,
   to = stop_date,
@@ -104,7 +137,7 @@ ts_grid <- data.frame(TIMESTAMP = seq(
 df_master <- merge(ts_grid, df_master, by = "TIMESTAMP", all.x = TRUE)
 ###########################
 
-write.csv(df_master,'C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik_met_202603_202607.csv',row.names = F)
+write.csv(df_master,'C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik_met_202608_202609.csv',row.names = F)
 ###########
 
 ###MERGE FLUX AND MET!!!!!!##########
@@ -370,7 +403,7 @@ df_slump <- unique(
 
 # 6. Generate continuous 30-minute time grid
 start_date <- as.POSIXct(
-  "2026-07-01 00:00:00",
+  "2026-08-01 00:00:00",
   tz = "UTC"
 )
 
@@ -399,18 +432,39 @@ df_slump <- merge(
 df_slump$TIMESTAMP <- format(as.POSIXct(df_slump$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
 write.csv(
   df_slump,
-  "C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik_slump_met_202607_202609.csv",
+  "C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik_slump_met_202608_202609.csv",
   row.names = FALSE
 )
 
+##############################################
 
+#COMBINE SLUMP WITH FLUX AND BIOMET!
 
+# Keep timestamps as POSIXct for merging
+df_slump$TIMESTAMP <- as.POSIXct(df_slump$TIMESTAMP, tz = "UTC")
+DF_1$TIMESTAMP     <- as.POSIXct(DF_1$TIMESTAMP, tz = "UTC")
 
+# Merge
+DF_2 <- merge(
+  DF_1,
+  df_slump,
+  by = "TIMESTAMP",
+  all = TRUE
+)
 
+# Format timestamp only for CSV output
+DF_1$TIMESTAMP <- format(
+  as.POSIXct(DF_1$TIMESTAMP, tz = "UTC"),
+  "%Y-%m-%d %H:%M"
+)
 
+write.csv(
+  DF_1,
+  "C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux/toolik_met_flux_202608_202609.csv",
+  row.names = FALSE
+)
 
-
-
+####################################################
 
 ################
 ####SINGLE FILE EDDYPRO PREPARATION####

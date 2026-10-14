@@ -6,8 +6,8 @@ library(rmarkdown)
 # POND INLET MONTHLY QC RENDER
 # ============================================================
 
-year <- 2025
-month <- 5
+year <- 2026
+month <- 9
 
 # Rmd location
 rmd_file <- paste0(

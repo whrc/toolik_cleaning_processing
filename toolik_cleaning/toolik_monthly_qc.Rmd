@@ -125,7 +125,7 @@ df$shf_avg = rowMeans(
 )
 
 df <- df %>%
-  mutate(across(c(SWC_12_36_1_1_1.c, SWC_12_36_2_1_1.c, SWC_12_36_3_1_1.c), ~ .x * 100))   # convert to %
+  mutate(across(c(SWC_12_36_1_1_1.c, SWC_12_36_1_2_1.c, SWC_12_36_1_3_1.c), ~ .x * 100))   # convert to %
 
 # Standardize air pressure across sensor change
 df$air_pressure <- ifelse(
@@ -2015,8 +2015,8 @@ p_pr
 P_soilT <- plot_flux_long(
   df_month,
   cols = c("TS_2_38_1_1_1.c",
-           "TS_2_38_2_1_1.c",
-           "TS_2_38_2_2_1.c"),
+           "TS_2_38_1_2_1.c",
+           "TS_2_38_1_3_1.c"),
   labels = c("08 cm", "18 cm", "28 cm"),
   colors = c("blue", "green", "gold3"),
   y_label = "Soil Temperature (°C)",
@@ -2037,8 +2037,8 @@ p_soilM <- plot_flux_long(
   df_month,
   cols = c(
     "SWC_12_36_1_1_1.c",
-    "SWC_12_36_2_1_1.c",
-    "SWC_12_36_3_1_1.c"
+    "SWC_12_36_1_2_1.c",
+    "SWC_12_36_1_3_1.c"
   ),
   labels = c(
     "08 cm",
@@ -2585,8 +2585,8 @@ for (w in sort(unique(df_month$week_in_month))) {
   p <- plot_flux_long(
     dfw,
     cols = c("TS_2_38_1_1_1.c",
-           "TS_2_38_2_1_1.c",
-           "TS_2_38_2_2_1.c"),
+           "TS_2_38_1_2_1.c",
+           "TS_2_38_1_3_1.c"),
     labels = c(
      "08 cm",
        "18 cm",
@@ -2622,8 +2622,8 @@ for (w in sort(unique(df_month$week_in_month))) {
     dfw,
     cols = c(
       "SWC_12_36_1_1_1.c",
-      "SWC_12_36_2_1_1.c",
-      "SWC_12_36_3_1_1.c"
+      "SWC_12_36_1_2_1.c",
+      "SWC_12_36_1_3_1.c"
     ),
     labels = c(
        "08 cm",

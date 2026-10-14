@@ -40,7 +40,7 @@ Load in eddypro output files
 ```
 
 ```{r, warning=FALSE}
-df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_tms_c_202603_202607.csv')
+df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202608_202609.csv')
 
 df[, TIMESTAMP := as.POSIXct(TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")]
 df$ts = df$TIMESTAMP
@@ -51,7 +51,7 @@ df$ts = df$TIMESTAMP
 #Creates a variable to input a date range for the plots in the flux section of
 #cleaning code. Used to easily change date range for different data sets. 
 ```{r, warning=FALSE}
-flux_dates <- c("2026-03-01",'2026-07-31')
+flux_dates <- c("2026-08-01",'2026-09-30')
 ```
 
 #Create Flags
@@ -232,6 +232,26 @@ plot(Tau.limits)
 
 ```
 
+
+```{r}
+signal.threshold.co2 <- ifelse(
+  df$TIMESTAMP < signal_cutoff,
+  ifelse(df$signal_mean >= 75, 0, 1),
+  ifelse(df$sig_strength_7500_mean >= 75, 0, 1)
+)
+signal.threshold.h2o <- ifelse(
+  df$TIMESTAMP < signal_cutoff,
+  ifelse(df$signal_mean >= 75, 0, 1),
+  ifelse(df$sig_strength_7500_mean >= 75, 0, 1)
+)
+signal.threshold.ch4 <- ifelse(
+  df$TIMESTAMP < signal_cutoff,
+  ifelse(df$rssi_77_mean >= 10, 0, 1),
+  ifelse(df$rssi_7700_mean >= 10, 0, 1)
+)
+
+```
+
 # Diagnostics Cleaning
 Clean some data based on instrument diagnostics
 ```{r}
@@ -240,31 +260,22 @@ signal_cutoff <- as.POSIXct(
   tz = "UTC"
 )
 
+
+
 signal.threshold.co2 <- ifelse(
-  df$TIMESTAMP < signal_cutoff,
-  ifelse(df$signal_mean >= 75, 0, 1),
-  ifelse(df$sig_strength_7500_mean >= 75, 0, 1)
+  df$co2_signal_strength_7200_mean >= 75, 0, 1 #for 7200 when installed in may 2026
 )
 
-#signal.threshold.co2 <- ifelse(
-#  df$co2_signal_strength_7200_mean >= 75, 0, 1 #for 7200 when installed in may 2026
-#)
 
 signal.threshold.h2o <- ifelse(
-  df$TIMESTAMP < signal_cutoff,
-  ifelse(df$signal_mean >= 75, 0, 1),
-  ifelse(df$sig_strength_7500_mean >= 75, 0, 1)
+  df$co2_signal_strength_7200_mean >= 75, 0, 1 #use when 7200 is part of df
 )
 
-#signal.threshold.h2o <- ifelse(
- # df$co2_signal_strength_7200_mean >= 75, 0, 1 #use when 7200 is part of df
-#)
+signal.threshold.ch4 <- 
+  ifelse(df$rssi_77_mean >= 10, 0, 1)
+  
 
-signal.threshold.ch4 <- ifelse(
-  df$TIMESTAMP < signal_cutoff,
-  ifelse(df$rssi_mean >= 10, 0, 1),
-  ifelse(df$rssi_7700_mean >= 10, 0, 1)
-)
+
 
 
 ggplot(data = df)+
@@ -1304,7 +1315,7 @@ ggplot(data = diel)+geom_hline(yintercept = 0)+
 df <- df[!duplicated(df$TIMESTAMP), ]
 df$TIMESTAMP <- format(as.POSIXct(df$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
 df$ts = format(as.POSIXct(df$ts), format ="%Y-%m-%d %H:%M")
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/toolik_flux_c_met_c_tms_202603_202607.csv',row.names = F,quote = F)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/toolik_flux_c_met_c_tms_202608_202609.csv',row.names = F,quote = F)
 ```
 
 #NEST AND SPLIT THE DATA BY MONTH AND SAVE IN DESIRED DIRECTORY
