@@ -32,7 +32,7 @@ Load data
 ```{r}
 
 
-df <- fread ("C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux/toolik_met_flux_202608_202609.csv")
+df <- fread ("C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux/toolik_master_flux_biomet_202608_202609.csv")
 
 ```
 
@@ -347,7 +347,7 @@ view_all_generated_plots_temp()
 ```{r}
 df <- df[!duplicated(df$TIMESTAMP), ]
 df$TIMESTAMP <- format(as.POSIXct(df$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux/toolik_met_flux_merged_aligned_202608_202609.csv',row.names = F,quote = F)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux/toolik_met_flux_aligned_202608_202609.csv',row.names = F,quote = F)
 
 ```
 

@@ -40,7 +40,7 @@ Load in eddypro output files
 ```
 
 ```{r, warning=FALSE}
-df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202608_202609.csv')
+df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_slump_c_202608_202609.csv')
 
 df[, TIMESTAMP := as.POSIXct(TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")]
 df$ts = df$TIMESTAMP
@@ -231,9 +231,15 @@ Tau.limits = replace(df$Tau,df$Tau < -0.8 | df$Tau > .2,NA)
 plot(Tau.limits)
 
 ```
+#SWAP THIS IF RUNNING 7500 DATA PRIOR TO 2026 08
 
+```{r, include=FALSE}
 
-```{r}
+signal_cutoff <- as.POSIXct(
+  "2026-04-27 12:00:00",
+  tz = "UTC"
+)
+
 signal.threshold.co2 <- ifelse(
   df$TIMESTAMP < signal_cutoff,
   ifelse(df$signal_mean >= 75, 0, 1),
@@ -255,11 +261,6 @@ signal.threshold.ch4 <- ifelse(
 # Diagnostics Cleaning
 Clean some data based on instrument diagnostics
 ```{r}
-signal_cutoff <- as.POSIXct(
-  "2026-04-27 12:00:00",
-  tz = "UTC"
-)
-
 
 
 signal.threshold.co2 <- ifelse(
@@ -407,8 +408,8 @@ co2_flux.limits = replace(
   NA
 )
 
-upper_limit <- 16
-lower_limit <- -16
+upper_limit <- 13
+lower_limit <- -13
 
 limit_fail <- df$co2_flux > upper_limit | df$co2_flux < lower_limit
 
@@ -463,7 +464,7 @@ hist(df$ch4_flux,breaks=100)
 
 plot(df$ts,df$ch4_flux,ylim = c(-.09,.095));abline(h=.3, col= 'red');abline(h=-.20, col='red'); abline(h=0,col= 'black')
 
-plot(df$ts,df$ch4_flux,ylim = c(-.03,.065));abline(h=.3, col= 'red');abline(h=-.20, col='red'); abline(h=0,col= 'black')
+plot(df$ts,df$ch4_flux,ylim = c(-.1,.1));abline(h=.3, col= 'red');abline(h=-.20, col='red'); abline(h=0,col= 'black')
 
 
 
@@ -482,7 +483,7 @@ CH4MOLE = ggplot(data = df)+geom_hline(yintercept = 0)+
  
 
 # Define absolute limits for CH4
-upper_limit_ch4 <- 0.08
+upper_limit_ch4 <- 0.1
 lower_limit_ch4 <- -0.05
 
 # Absolute CH4 limits
@@ -545,7 +546,7 @@ Clean based on graphs, create new variable (H.limits), and see cleaned product
 
 ```{r, warning=FALSE}
 # Define absolute limits - these will vary greatly depending on time of year
-H_upper <- 250 #did 100 for 7200 not as high
+H_upper <- 200 #did 100 for 7200 not as high
 H_lower <- -150
 
 # Create a "limited" vector for plotting and filtering
@@ -1315,7 +1316,7 @@ ggplot(data = diel)+geom_hline(yintercept = 0)+
 df <- df[!duplicated(df$TIMESTAMP), ]
 df$TIMESTAMP <- format(as.POSIXct(df$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
 df$ts = format(as.POSIXct(df$ts), format ="%Y-%m-%d %H:%M")
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/toolik_flux_c_met_c_tms_202608_202609.csv',row.names = F,quote = F)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/flux_c_met_c_slump_c_202608_202609.csv',row.names = F,quote = F)
 ```
 
 #NEST AND SPLIT THE DATA BY MONTH AND SAVE IN DESIRED DIRECTORY
