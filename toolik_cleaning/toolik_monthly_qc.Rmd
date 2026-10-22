@@ -8,9 +8,9 @@ output:
     toc_float: true
 params:
   year:
-    value: 2025  # change year !
+    value: 2026  # change year !
   month:
-    value: 8  # you need to change the month number !
+    value: 9  # you need to change the month number !
 ---
 
 ```{r setup, include=FALSE}
@@ -48,8 +48,45 @@ setwd('C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux')
 
 ```
 
+```{r}
+# Load shared monthly QC settings
+
+settings_rmd <- "C:/Users/klynoe/Documents/misc_R/qc_loaders/monthly_qc_plot_settings.rmd"
+
+# Check that the file exists
+if (!file.exists(settings_rmd)) {
+  stop("Settings Rmd file not found: ", settings_rmd)
+}
+
+# Extract the R code from the Rmd
+settings_r <- tempfile(fileext = ".R")
+
+knitr::purl(
+  settings_rmd,
+  output = settings_r,
+  quiet = TRUE
+)
+
+# Load the shared plotting functions
+source(settings_r, local = .GlobalEnv)
+
+# Remove temporary extracted file
+unlink(settings_r)
+
+# Confirm that the plotting functions loaded
+stopifnot(
+  exists("plot_flux", mode = "function"),
+  exists("plot_flux_single", mode = "function"),
+  exists("plot_week_flux", mode = "function"),
+  exists("plot_biweek_flux", mode = "function")
+)
+
+message("Monthly QC settings loaded successfully.")
+
+```
 
 ```{r, include = FALSE}
+
 
 year <- params$year
 month <- params$month
@@ -133,6 +170,10 @@ df$air_pressure <- ifelse(
   df$air_p_mean.c,
   df$PA_4_2_1_1_1.c
 )
+
+
+df_month <- make_week_index(df)
+df_month <- make_biweek_index(df_month)
 
 ```
 
@@ -855,7 +896,7 @@ co2_plot_month <- plot_flux(
   ),
   title = "CO2 Flux",
   site = "Toolik",
-  focus_90 = TRUE
+  ylim = (c(-3,8))
 )
 
 
@@ -889,7 +930,7 @@ ch4_plot_month <- plot_flux(
   expression(paste(~CH[4], ~"Flux (umol m",""^-2,"s",""^-1,")")),
   title = "CH4 Flux",
   site = "Toolik",
-  focus_90 = TRUE
+  ylim = (c(-0.05,0.10))
 )
 ch4_plot_month
 ```
@@ -916,7 +957,7 @@ H_plot_ytd <- plot_flux(
  # c(-200, 200),
   expression(paste("H (W/m²)")),
   site = "Toolik",
- focus_90 = TRUE
+ ylim = (c(-100,100))
 )
 
 H_plot_ytd
@@ -947,7 +988,7 @@ LE_plot_month<- plot_flux(
  # c(-100, 150),
   expression(paste("LE (W/m²)")),
   site = "Toolik",
- focus_90 = T
+ ylim = (c(-25,75))
 )
 
 LE_plot_month
@@ -1148,6 +1189,32 @@ plot_diel <- function(df, value_col, sd_col,
 
 ```
 
+```{r,echo=FALSE}
+
+# ============================================================
+# DIURNAL FLUXES
+# ============================================================
+
+source(
+  "C:/Users/klynoe/Documents/misc_R/qc_loaders/monthly_qc_diurnal.R",
+  local = TRUE
+)
+
+df_month <- prepare_diel_data(df_month)
+
+# Monthly diel
+diel_month <- make_diel(
+  df_month,
+  group_cols = c("year", "month", "hour")
+)
+
+# Weekly diel
+diel_week <- make_diel(
+  df_month,
+  group_cols = c("year", "month", "week_in_month", "hour")
+)
+
+```
 #MONTHLY DIURNALS
 
 ```{R, echo = F}
@@ -2397,7 +2464,7 @@ for (w in sort(unique(df_month$biweek_in_month))) {
     date_labels = "%b %d",
     site = "Toolik"
   )
-  
+ 
   
   # Longwave radiation: Incoming + Outgoing
   p_lw <- plot_flux_long(
@@ -2503,7 +2570,8 @@ for (w in sort(unique(df_month$biweek_in_month))) {
     "Air Pressure (kPa)",
     "Air Pressure",
     "black",
-    site = "Toolik"
+    site = "Toolik",
+    y_limits = c(70,100)
   )
   
   print(p)
