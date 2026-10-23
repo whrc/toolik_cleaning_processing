@@ -129,15 +129,7 @@ df$LE.flag <- factor(df$LE.flag, levels = c("0","1","2","3","4","5"))
 
 ```
 
-#ADD SENSOR MAPPER - needs work or skip
-```{r, echo=F}
 
-#source("C:/Users/klynoe/Documents/pp github reps/toolik_cleaning_processing/toolik_cleaning/toolik_sensor_mapper.R")
-
-#df <- translate_soil_sensors(df)
-
-```
-df <- translate_soil_sensors(df)
 
 # Add any calculations that you want to keep throughout (make sure to adjust accordingly to site)
 ```{r, warning=FALSE, include=FALSE}
@@ -177,679 +169,6 @@ df_month <- make_biweek_index(df_month)
 
 ```
 
-
-#WEEK / BIWEEK INDEX
-
-```{R, echo = F}
-# ============================================================
-# WEEK + BIWEEK INDEX
-# ============================================================
-
-make_week_index <- function(df, time_col = "TIMESTAMP") {
-
-  start_month <- as.POSIXct(
-    format(
-      min(df[[time_col]], na.rm = TRUE),
-      "%Y-%m-01 00:00"
-    ),
-    tz = "UTC"
-  )
-
-  df$week_in_month <- floor(
-    as.numeric(
-      difftime(
-        df[[time_col]],
-        start_month,
-        units = "days"
-      )
-    ) / 7
-  ) + 1
-
-  df
-}
-
-
-make_biweek_index <- function(df, time_col = "TIMESTAMP") {
-
-  start_month <- as.POSIXct(
-    format(
-      min(df[[time_col]], na.rm = TRUE),
-      "%Y-%m-01 00:00"
-    ),
-    tz = "UTC"
-  )
-
-  df$biweek_in_month <- floor(
-    as.numeric(
-      difftime(
-        df[[time_col]],
-        start_month,
-        units = "days"
-      )
-    ) / 14
-  ) + 1
-
-  df
-}
-
-
-# Apply BOTH indices
-df_month <- make_week_index(df)
-df_month <- make_biweek_index(df_month)
-
-```
-
-#FLUX PLOTTER
-
-```{r, echo=F}
-
-plot_flux <- function(df, flux_base,
-                      y_label,
-                      ylims = NULL,
-                      title = NULL,
-                      site = NULL,
-                      focus_90 = FALSE) {
-
-  flux      <- flux_base
-  flux_c    <- paste0(flux_base, ".c")
-  flux_flag <- paste0(flux_base, ".flag")
-
-  df$.__flux__      <- df[[flux]]
-  df$.__flux_c__    <- df[[flux_c]]
-  df$.__flux_flag__ <- df[[flux_flag]]
-
-  # ------------------------------------------------------------
-  # QC flag colors and labels
-  # ------------------------------------------------------------
-
-  color_map <- c(
-    "0" = "yellow3",
-    "1" = "darkblue",
-    "2" = "red4",
-    "3" = "orange",
-    "4" = "green4",
-    "5" = "purple"
-  )
-
-  flag_labels <- c(
-    "0" = "0 - EP Flag",
-    "1" = "1 - EP Flag",
-    "2" = "2 - EP Flag",
-    "3" = "3 - Absolute Limits Filter",
-    "4" = "4 - Rolling MAD Filter",
-    "5" = "5 - Diagnostics"
-  )
-
-  if (is.null(ylims)) {
-
-  all_values <- c(df$.__flux__, df$.__flux_c__)
-  all_values <- all_values[is.finite(all_values)]
-
-  if (length(all_values) > 0) {
-
-    if (focus_90) {
-
-      # Central 90% of the data
-      ylims <- quantile(
-        all_values,
-        probs = c(0.05, 0.95),
-        na.rm = TRUE
-      )
-
-    } else {
-
-      # Full spread of the data
-      ylims <- range(all_values)
-
-    }
-
-    # 5% padding
-    y_pad <- diff(ylims) * 0.05
-
-    if (y_pad == 0) {
-      y_pad <- max(abs(ylims[1]) * 0.05, 1)
-    }
-
-    ylims <- c(
-      ylims[1] - y_pad,
-      ylims[2] + y_pad
-    )
-  }
-}
-
-  plot_title <- if (!is.null(site) && !is.null(title)) {
-    paste(site, "-", title)
-  } else if (!is.null(site)) {
-    site
-  } else {
-    title
-  }
-
-  ggplot(df) +
-    geom_hline(yintercept = 0) +
-
-    geom_point(
-      aes(
-        TIMESTAMP,
-        .__flux__,
-        color = .__flux_flag__
-      ),
-      na.rm = TRUE
-    ) +
-
-    geom_point(
-      aes(
-        TIMESTAMP,
-        .__flux_c__
-      ),
-      color = "black",
-      na.rm = TRUE
-    ) +
-
-    scale_y_continuous(
-      limits = ylims
-    ) +
-
-    labs(
-      title = plot_title,
-      x = NULL,
-      y = y_label
-    ) +
-
-    scale_color_manual(
-      values = color_map,
-      labels = flag_labels,
-      breaks = names(color_map),
-      name = "Cleaning Flag",
-      na.translate = FALSE
-    ) +
-
-    theme_bw()
-}
-
-```
-
-#WEEKLY PLOTTER
-
-```{r, echo=F}
-
-# ============================================================
-# WEEKLY FLUX PLOTTER
-# ============================================================
-
-plot_week_flux <- function(df, week_num,
-                           flux_base,
-                           y_label,
-                           ylims = NULL,
-                           site = "Toolik") {
-
-  flux_col <- flux_base
-  flux_c_col <- paste0(flux_base, ".c")
-
-  # Check requested columns exist
-  if (!flux_col %in% names(df) &&
-      !flux_c_col %in% names(df)) {
-    return(NULL)
-  }
-
-  dfw <- subset(
-    df,
-    week_in_month == week_num
-  )
-
-  # No rows
-  if (nrow(dfw) == 0) {
-    return(NULL)
-  }
-
-  # Check for actual data
-  raw_has_data <- FALSE
-  clean_has_data <- FALSE
-
-  if (flux_col %in% names(dfw)) {
-    raw_has_data <- any(is.finite(dfw[[flux_col]]))
-  }
-
-  if (flux_c_col %in% names(dfw)) {
-    clean_has_data <- any(is.finite(dfw[[flux_c_col]]))
-  }
-
-  # No actual data -> no plot
-  if (!raw_has_data && !clean_has_data) {
-    return(NULL)
-  }
-
-  plot_flux(
-    dfw,
-    flux_base,
-    y_label = y_label,
-    ylims = ylims,
-    title = paste("Week", week_num),
-    site = site
-  )
-}
-
-```
-#BIWEEK FLUX PLOTTER
-
-```{R, echo = F}
-# ============================================================
-# BIWEEK FLUX PLOTTER
-# ============================================================
-
-plot_biweek_flux <- function(df, biweek_num,
-                             flux_base,
-                             y_label,
-                             ylims = NULL,
-                             site = "Toolik") {
-
-  flux_col <- flux_base
-  flux_c_col <- paste0(flux_base, ".c")
-
-  if (!flux_col %in% names(df) &&
-      !flux_c_col %in% names(df)) {
-    return(NULL)
-  }
-
-  dfbw <- subset(
-    df,
-    biweek_in_month == biweek_num
-  )
-
-  if (nrow(dfbw) == 0) {
-    return(NULL)
-  }
-
-  raw_has_data <- FALSE
-  clean_has_data <- FALSE
-
-  if (flux_col %in% names(dfbw)) {
-    raw_has_data <- any(is.finite(dfbw[[flux_col]]))
-  }
-
-  if (flux_c_col %in% names(dfbw)) {
-    clean_has_data <- any(is.finite(dfbw[[flux_c_col]]))
-  }
-
-  if (!raw_has_data && !clean_has_data) {
-    return(NULL)
-  }
-
-  plot_flux(
-    dfbw,
-    flux_base,
-    y_label = y_label,
-    ylims = ylims,
-    title = paste("Biweek", biweek_num),
-    site = site
-  )
-}
-
-```
-
-```{R, echo =F}
-# ============================================================
-# PLOT BUILDERS
-# ============================================================
-
-# Break lines across large timestamp gaps
-break_gaps <- function(df, ts_col, value_col, max_gap_minutes = 90) {
-
-  df <- df[order(df[[ts_col]]), ]
-
-  dt <- as.numeric(
-    difftime(
-      df[[ts_col]],
-      dplyr::lag(df[[ts_col]]),
-      units = "mins"
-    )
-  )
-
-  gap <- dt > max_gap_minutes
-  gap[is.na(gap)] <- FALSE
-
-  df[[value_col]][gap] <- NA
-
-  df
-}
-
-
-# Dynamic y-axis limits
-dynamic_limits <- function(x, pad = 0.05) {
-
-  x <- x[is.finite(x)]
-
-  if (length(x) == 0) {
-    return(NULL)
-  }
-
-  rng <- range(x)
-
-  # Handle constant values
-  if (rng[1] == rng[2]) {
-    extra <- max(abs(rng[1]) * 0.05, 1)
-    return(c(rng[1] - extra, rng[2] + extra))
-  }
-
-  extra <- diff(rng) * pad
-
-  c(rng[1] - extra, rng[2] + extra)
-}
-
-```
-
-```{r, echo=F}
-
-
-
-```
-
-#MAIN TIMESERIES PLOTTER FUNCTION
-#SINGLE VARIABLES
-
-```{r, echo=F}
-plot_flux_single <- function(df, ts_col = "TIMESTAMP", flux_col,
-                             y_label, title, color = "blue", 
-                             date_breaks = "1 month", date_labels = "%b",
-                             smooth = FALSE,
-                             y_limits = NULL,
-                             clip_smooth = NULL,
-                             site = NULL){
-
-  df_line   <- break_gaps(df, ts_col, flux_col)
-  df_smooth <- df
-
-  # Dynamic limits if none supplied
-  if (is.null(y_limits)) {
-    y_limits <- dynamic_limits(df_line[[flux_col]])
-  }
-
-  if (!is.null(site)) {
-    title <- paste(site, "-", title)
-  }
-
-  p <- ggplot(df_line, aes(x = .data[[ts_col]])) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
-    geom_line(
-      aes(x = .data[[ts_col]], y = .data[[flux_col]]),
-      linewidth = 0.8,
-      alpha = 0.6,
-      color = color
-    ) + 
-    labs(
-      x = "",
-      y = y_label,
-      title = title
-    ) + 
-    scale_y_continuous(
-      limits = y_limits,
-      expand = expansion(mult = 0.05),
-      breaks = scales::pretty_breaks(n = 8)
-    ) +
-    scale_x_datetime(
-      date_breaks = date_breaks, 
-      date_labels = date_labels
-    ) +
-    theme_minimal() + 
-    theme(
-      axis.text.x = element_text(angle = 45, hjust = 1)
-    )
-
-  if (smooth) {
-
-    if (flux_col %in% roll_vars) {
-
-      df_roll <- roll_smooth(
-        df_smooth,
-        ts_col,
-        flux_col,
-        k = 96
-      )
-
-      p <- p + geom_line(
-        data = df_roll,
-        aes(
-          x = .data[[ts_col]],
-          y = .data[["roll"]]
-        ),
-        color = "black",
-        linewidth = 0.9
-      )
-
-    } else {
-
-      n <- nrow(df_smooth)
-
-      span_auto <- max(
-        min((48 * 2) / n, 0.2),
-        0.01
-      )
-
-      p <- p + geom_smooth(
-        data = df_smooth,
-        aes(
-          x = .data[[ts_col]],
-          y = .data[[flux_col]]
-        ),
-        method = "loess",
-        span = span_auto,
-        color = "black",
-        linewidth = 0.7,
-        se = FALSE
-      )
-
-      if (!is.null(clip_smooth)) {
-        p <- p + coord_cartesian(
-          ylim = clip_smooth
-        )
-      }
-    }
-  }
-
-  return(p)
-}
-
-
-```
-
-#SINGLE BIWEK PLOTTER
-
-```{r, echo=F}
-# ============================================================
-# BIWEEK SINGLE PLOTTER
-# ============================================================
-
-plot_biweek_single <- function(df, biweek_num,
-                               flux_col,
-                               y_label,
-                               title,
-                               color,
-                               date_breaks = "2 days",
-                               date_labels = "%b %d",
-                               y_limits = NULL,
-                               clip_smooth = NULL,
-                               site = "Toolik") {
-  
-  dfbw <- subset(
-    df,
-    biweek_in_month == biweek_num
-  )
-  
-  if (nrow(dfbw) == 0) {
-    return(NULL)
-  }
-  
-  if (all(is.na(dfbw[[flux_col]]))) {
-    return(NULL)
-  }
-  
-  plot_flux_single(
-    dfbw,
-    flux_col = flux_col,
-    y_label = y_label,
-    title = paste(title, "- Biweek", biweek_num),
-    color = color,
-    date_breaks = date_breaks,
-    date_labels = date_labels,
-    y_limits = y_limits,
-    clip_smooth = clip_smooth,
-    site = site
-  )
-}
-
-```
-
-#MULTIPLE VARIABLES
-
-```{r, echo=F}
-
-
-
-plot_flux_long <- function(df, ts_col = "TIMESTAMP", 
-                           cols, labels, colors, 
-                           y_label, title, 
-                           date_breaks = "1 month",
-                           date_labels = "%b", 
-                           smooth = FALSE,
-                           y_limits = NULL,
-                           site = NULL) {
-  # Do not make a plot if none of the requested variables contain data
-has_data <- sapply(
-  cols,
-  function(v) any(!is.na(df[[v]]))
-)
-
-if (!any(has_data)) {
-  return(NULL)
-}
-
-  raw_list <- lapply(cols, function(v) {
-    
-    dfv <- df[, c(ts_col, v), drop = FALSE]
-    names(dfv) <- c(ts_col, "value")
-    dfv$variable <- v
-    
-    dfv <- break_gaps(dfv, ts_col, "value")
-    dfv
-  })
-  
-  df_long <- do.call(rbind, raw_list)
-  df_long$variable <- factor(
-    df_long$variable,
-    levels = cols
-  )
-  
-  # Dynamic limits across all variables
-  if (is.null(y_limits)) {
-    y_limits <- dynamic_limits(df_long$value)
-  }
-  
-  if (!is.null(site)) {
-    title <- paste(site, "-", title)
-  }
-  
-  p <- ggplot(
-    df_long,
-    aes(
-      x = .data[[ts_col]],
-      y = value,
-      color = variable
-    )
-  ) +
-    geom_line(
-      alpha = 0.6,
-      linewidth = 0.8
-    ) + 
-    scale_color_manual(
-      values = colors,
-      labels = labels,
-      name = NULL
-    ) + 
-    scale_y_continuous(
-      limits = y_limits,
-      expand = expansion(mult = 0.05),
-      breaks = scales::pretty_breaks(n = 8),
-      name = y_label
-    ) + 
-    scale_x_datetime(
-      date_breaks = date_breaks, 
-      date_labels = date_labels
-    ) + 
-    labs(
-      title = title,
-      x = ""
-    ) +
-    theme_minimal() + 
-    theme(
-      axis.text.x = element_text(
-        angle = 45,
-        hjust = 1
-      ),
-      legend.position = "top"
-    )
-  
-  if (smooth) {
-    
-    smooth_list <- lapply(cols, function(v) {
-      
-      dfv <- df[, c(ts_col, v), drop = FALSE]
-      names(dfv) <- c(ts_col, "value")
-      dfv$variable <- v
-      
-      if (v %in% roll_vars) {
-        
-        dfv <- roll_smooth(
-          dfv,
-          ts_col,
-          "value",
-          k = 96
-        )
-        
-        dfv$smooth_value <- dfv$roll
-        
-      } else {
-        
-        n <- nrow(dfv)
-        
-        span_auto <- max(
-          min((48 * 2) / n, 0.2),
-          0.01
-        )
-        
-        lo <- loess(
-          value ~ as.numeric(dfv[[ts_col]]),
-          data = dfv,
-          span = span_auto,
-          na.action = na.exclude
-        )
-        
-        dfv$smooth_value <- predict(lo)
-      }
-      
-      dfv
-    })
-    
-    df_smooth <- do.call(rbind, smooth_list)
-    
-    df_smooth$variable <- factor(
-      df_smooth$variable,
-      levels = cols
-    )
-    
-    p <- p + geom_line(
-      data = df_smooth,
-      aes(
-        x = .data[[ts_col]],
-        y = smooth_value,
-        color = variable
-      ),
-      linewidth = 0.9
-    )
-  }
-  
-  return(p)
-}
-```
 
 #CO2
 
@@ -903,7 +222,6 @@ co2_plot_month <- plot_flux(
 co2_plot_month
 
 ```
-
 
 #CH4
 
@@ -1702,6 +1020,7 @@ wind_compare_data <- function(df, rmy_col, sonic_col,
 
 # ============================================================
 # WIND SPEED
+# Color = deviation between RMYOUNG and Sonic
 # ============================================================
 
 df_wind <- wind_compare_data(
@@ -1711,115 +1030,51 @@ df_wind <- wind_compare_data(
 )
 
 if (!is.null(df_wind)) {
-
-  wind_ws_11 <- ggplot(df_wind) +
-
-    geom_point(
-      aes(
-        x = wind_speed,
-        y = wind_speed,
-        color = "RMYOUNG"
-      ),
-      alpha = 0.5
-    ) +
-
-    geom_point(
-      aes(
-        x = wind_speed,
-        y = WS_16_33_1_1_1,
-        color = "Sonic"
-      ),
-      alpha = 0.5
-    ) +
-
+  
+  # Signed difference: Sonic - RMYOUNG
+  df_wind$wind_speed_diff <-
+    df_wind$WS_16_33_1_1_1 - df_wind$wind_speed
+  
+  wind_ws_11 <- ggplot(
+    df_wind,
+    aes(
+      x = wind_speed,
+      y = WS_16_33_1_1_1,
+      color = wind_speed_diff
+    )
+  ) +
+    
+    geom_point(alpha = 0.6) +
+    
     geom_abline(
       intercept = 0,
       slope = 1,
       linetype = "dashed",
       color = "black"
     ) +
-
-    scale_color_manual(
-      values = c(
-        "RMYOUNG" = "red",
-        "Sonic" = "blue"
-      )
+    
+    scale_color_gradient2(
+      low = "blue",
+      mid = "grey90",
+      high = "red",
+      midpoint = 0,
+      name = "Sonic - RMYOUNG (m/s)"
     ) +
-
+    
     labs(
       title = "Toolik - Wind Speed Comparison",
       x = "RMYOUNG Wind Speed (m/s)",
-      y = "Sonic Wind Speed (m/s)",
-      color = "Instrument"
+      y = "Sonic Wind Speed (m/s)"
     ) +
-
+    
     theme_bw()
-
-  wind_ws_11
+  
+ 
 }
-
-
-# ============================================================
-# MAXIMUM WIND SPEED
-# ============================================================
-
-df_mws <- wind_compare_data(
-  df_month,
-  "max_wind_speed",
-  "MWS_16_34_1_1_1"
-)
-
-if (!is.null(df_mws)) {
-
-  wind_mws_11 <- ggplot(df_mws) +
-
-    geom_point(
-      aes(
-        x = max_wind_speed,
-        y = max_wind_speed,
-        color = "RMYOUNG"
-      ),
-      alpha = 0.5
-    ) +
-
-    geom_point(
-      aes(
-        x = max_wind_speed,
-        y = MWS_16_34_1_1_1,
-        color = "Sonic"
-      ),
-      alpha = 0.5
-    ) +
-
-    geom_abline(
-      intercept = 0,
-      slope = 1,
-      linetype = "dashed",
-      color = "black"
-    ) +
-
-    scale_color_manual(
-      values = c(
-        "RMYOUNG" = "red",
-        "Sonic" = "blue"
-      )
-    ) +
-
-    labs(
-      title = "Toolik - Maximum Wind Speed Comparison",
-      x = "RMYOUNG Maximum Wind Speed (m/s)",
-      y = "Sonic Maximum Wind Speed (m/s)",
-      color = "Instrument"
-    ) +
-
-    theme_bw()
-
-  wind_mws_11
-}
-
 
 # ============================================================
 # WIND DIRECTION
+# Color = angular deviation between RMYOUNG and Sonic
 # ============================================================
 
 df_dir <- wind_compare_data(
@@ -1829,65 +1084,65 @@ df_dir <- wind_compare_data(
 )
 
 if (!is.null(df_dir)) {
-
-  wind_dir_11 <- ggplot(df_dir) +
-
-    geom_point(
-      aes(
-        x = wind_dir,
-        y = wind_dir,
-        color = "RMYOUNG"
-      ),
-      alpha = 0.5
-    ) +
-
-    geom_point(
-      aes(
-        x = wind_dir,
-        y = WD_20_35_1_1_1,
-        color = "Sonic"
-      ),
-      alpha = 0.5
-    ) +
-
+  
+  # Signed shortest angular difference: -180 to +180 degrees
+  df_dir$direction_diff <- (
+    (df_dir$WD_20_35_1_1_1 - df_dir$wind_dir + 180) %% 360
+  ) - 180
+  
+  wind_dir_11 <- ggplot(
+    df_dir,
+    aes(
+      x = wind_dir,
+      y = WD_20_35_1_1_1,
+      color = direction_diff
+    )
+  ) +
+    
+    geom_point(alpha = 0.6) +
+    
     geom_abline(
       intercept = 0,
       slope = 1,
       linetype = "dashed",
       color = "black"
     ) +
-
-    scale_color_manual(
-      values = c(
-        "RMYOUNG" = "red",
-        "Sonic" = "blue"
-      )
+    
+    scale_color_gradient2(
+      low = "blue",
+      mid = "grey90",
+      high = "red",
+      midpoint = 0,
+      limits = c(-180, 180),
+      breaks = seq(-180, 180, by = 45),
+      name = "Sonic - RMYOUNG (°)"
     ) +
-
+    
     scale_x_continuous(
       limits = c(0, 360),
       breaks = seq(0, 360, by = 45)
     ) +
-
+    
     scale_y_continuous(
       limits = c(0, 360),
       breaks = seq(0, 360, by = 45)
     ) +
-
+    
     labs(
       title = "Toolik - Wind Direction Comparison",
       x = "RMYOUNG Wind Direction (°)",
-      y = "Sonic Wind Direction (°)",
-      color = "Instrument"
+      y = "Sonic Wind Direction (°)"
     ) +
-
+    
     theme_bw()
-
-  wind_dir_11
+  
+  
 }
+
+ wind_ws_11
+ wind_dir_11
+ 
 ```
-
-
 
 #WIND ROSES
 
@@ -1924,7 +1179,7 @@ if (nrow(df_wind_sonic) == 0) {
     ws = "ws",
     wd = "wd",
     paddle = FALSE,
-    key = TRUE,
+    key.position = "bottom",
     main = "Toolik - Sonic Anemometer Wind Rose"
   )
 }
@@ -1961,7 +1216,7 @@ if (nrow(df_wind_rmy) == 0) {
     ws = "ws",
     wd = "wd",
     paddle = FALSE,
-    key = TRUE,
+    key.position = "bottom",
     main = "Toolik - RMY Wind Rose"
   )
 }
@@ -2022,7 +1277,8 @@ p_pres <- plot_flux_single(
   color    = "black",
   date_breaks = "2 days",
   date_labels = "%b %d",
-  site = "Toolik"
+  site = "Toolik",
+  y_limits = c(70,100)
 )
 
 p_pres
@@ -2068,7 +1324,8 @@ p_pr <- plot_flux_single(df, flux_col = "P_RAIN_8_19_1_1_1.c",
                              color = "blue",
                              date_breaks = "2 days",
                              date_labels = "%b %d",
-                         site = "Toolik")
+                         site = "Toolik"
+                                      )
                           
 
 p_pr
@@ -2156,11 +1413,156 @@ p_G <- plot_flux_long(
 p_G
 
 ```
+# SLUMP SENSORS
 
+# SLUMP SINGLE SOIL TEMP
+```{r, warning=F}
+PS_soilT <- plot_flux_long(
+  df_month,
+  cols = c("TS_2_38_2_1_1.c",
+           "TS_2_38_3_1_1.c",
+           "TS_2_38_4_1_1.c"),
+   labels = c(
+    "Bare Soil",
+    "Floating Veg.",
+    "Dense Veg."
+  ),
+   colors = c(
+     "brown",
+    "turquoise4",
+    "green4"
+  ),
+  y_label = "Soil Temperature (°C)",
+  title = "Slump Soil Temperature - 10 cm",
+  site = "Toolik",
+  date_breaks = "2 days",
+  date_labels = "%b %d")
 
+PS_soilT
 
+```
+# SLUMP SINGLE SWC
+```{r, warning=F}
+pS_soilM <- plot_flux_long(
+  df_month,
+  cols = c(
+    "SWC_12_36_2_1_1.c",
+    "SWC_12_36_3_1_1.c",
+    "SWC_12_36_4_1_1.c"
+  ),
+   labels = c(
+    "Bare Soil",
+    "Floating Veg.",
+    "Dense Veg."
+  ),
+   colors = c(
+     "brown",
+    "turquoise4",
+    "green4"
+  ),
+  y_label = "Soil Moisture (%)",
+  title = "Slump Soil Moisture - 10 cm",
+  site = "Toolik",
+  date_breaks = "2 days",
+  date_labels = "%b %d"
+)
 
+pS_soilM
 
+```
+
+#SLUMP HEAT FLUX 
+```{r, warning=FALSE}
+
+p_GS <- plot_flux_long(
+  df_month,
+  cols = c(
+    "SHF_6_37_3_1_1.c",
+    "SHF_6_37_4_1_1.c",
+    "SHF_6_37_5_1_1.c"
+  ),
+  labels = c(
+    "Bare Soil",
+    "Floating Veg.",
+    "Dense Veg."
+  ),
+  colors = c(
+     "brown",
+    "turquoise4",
+    "green4"
+  ),
+  y_label = expression(Soil~Heat~Flux~(W/m^2)),
+  title = "Slump Soil Heat Flux",
+  site = "Toolik",
+  date_breaks = "2 days",
+  date_labels = "%b %d"
+)
+
+p_GS
+
+```
+#SLUMP SOIL TEMPERATURE PROFILE BARE SOIL
+
+```{r, warning=FALSE, echo=FALSE}
+PSB_soilT <- plot_flux_long(
+  df_month,
+  cols = c("TS_2_38_6_1_1.c",
+           "TS_2_38_6_2_1.c",
+           "TS_2_38_6_3_1.c",
+           "TS_2_38_6_4_1.c",
+           "TS_2_38_6_5_1.c",
+           "TS_2_38_6_6_1.c"
+           ),
+  labels = c("05 cm", 
+             "10 cm", 
+             "20 cm",
+             "30 cm",
+             "40 cm",
+             "50 cm"
+             ),
+    colors = hcl.colors(6, "Spectral"),
+  y_label = "Soil Temperature (°C)",
+  title = "Slump Bare Soil Temperature by Depth",
+  site = "Toolik",
+  date_breaks = "2 days",
+  date_labels = "%b %d",
+  legend_pos = "right"
+  )
+
+PSB_soilT
+
+```
+
+#SLUMP SOIL TEMPERATURE PROFILE DENSE VEGETATION
+
+```{r, warning=FALSE, echo=FALSE}
+PSB_soilT <- plot_flux_long(
+  df_month,
+  cols = c("TS_2_38_7_1_1.c",
+           "TS_2_38_7_2_1.c",
+           "TS_2_38_7_3_1.c",
+           "TS_2_38_7_4_1.c",
+           "TS_2_38_7_5_1.c",
+           "TS_2_38_7_6_1.c"
+           ),
+  labels = c("05 cm", 
+             "10 cm", 
+             "20 cm",
+             "30 cm",
+             "40 cm",
+             "50 cm"
+             ),
+   colors = hcl.colors(6, "Spectral"),
+  y_label = "Soil Temperature (°C)",
+  title = "Slump Dense Veg. Soil Temperature by Depth",
+  site = "Toolik",
+  date_breaks = "2 days",
+  date_labels = "%b %d",
+  legend_pos = "right")
+
+PSB_soilT
+
+```
 
 # TOMST SLUMP
 ```{R, echo=F}
@@ -2342,6 +1744,7 @@ p4 <- plot_tms(
 
 if (!is.null(p4)) print(p4)
 ```
+
 #WEEKLY CO2
 
 ```{r, echo=F}

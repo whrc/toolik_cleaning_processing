@@ -606,17 +606,25 @@ ggplot(data = df)+
 
 ```
 
+#RAIN
+
+```{r, warning=FALSE}
+
+ggplot(data = df)+
+  geom_point(aes(TIMESTAMP,P_RAIN_8_19_1_1_1),col='black')+
+  scale_y_continuous(limits = c(0,5),
+                     expression('Precip. Rain (mm)'))+
+ scale_x_datetime(limits = as.POSIXct(biomet_dates))
 
 
+```
 
+# ADD .C
+```{r, warning=FALSE}
 
+df$P_RAIN_8_19_1_1_1.c = df$P_RAIN_8_19_1_1_1
 
-
-
-
-
-
-
+```
 
 # PAR IN 
 ```{r, warning=FALSE}
