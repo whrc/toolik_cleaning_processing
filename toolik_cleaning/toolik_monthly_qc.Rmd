@@ -127,6 +127,7 @@ df$LE.flag <- factor(df$LE.flag, levels = c("0","1","2","3","4","5"))
 #df$ch4_flux.flag <- as.factor(df$ch4_flux.flag)
 
 
+
 ```
 
 
@@ -162,7 +163,6 @@ df$air_pressure <- ifelse(
   df$air_p_mean.c,
   df$PA_4_2_1_1_1.c
 )
-
 
 df_month <- make_week_index(df)
 df_month <- make_biweek_index(df_month)
@@ -315,198 +315,6 @@ LE_plot_month
 
 #DIURNAL FLUXES
 
-```{r, echo=F}
-
-# ============================================================
-# DIURNAL FLUXES
-# ============================================================
-
-df_month$hour <- as.numeric(
-  format(df_month$TIMESTAMP, "%H")
-)
-
-df_month$year <- as.numeric(
-  format(df_month$TIMESTAMP, "%Y")
-)
-
-df_month$month <- as.numeric(
-  format(df_month$TIMESTAMP, "%m")
-)
-
-
-make_diel <- function(
-    df,
-    group_cols = c("year", "month", "hour")
-) {
-
-  df %>%
-    group_by(across(all_of(group_cols))) %>%
-    summarise(
-
-      co2_mean = ifelse(
-        all(is.na(co2_flux.c)),
-        NA_real_,
-        median(co2_flux.c, na.rm = TRUE)
-      ),
-
-      co2_sd = ifelse(
-        sum(!is.na(co2_flux.c)) < 2,
-        NA_real_,
-        sd(co2_flux.c, na.rm = TRUE)
-      ),
-
-
-      ch4_mean = ifelse(
-        all(is.na(ch4_flux.c)),
-        NA_real_,
-        median(ch4_flux.c, na.rm = TRUE)
-      ),
-
-      ch4_sd = ifelse(
-        sum(!is.na(ch4_flux.c)) < 2,
-        NA_real_,
-        sd(ch4_flux.c, na.rm = TRUE)
-      ),
-
-
-      LE_mean = ifelse(
-        all(is.na(LE.c)),
-        NA_real_,
-        median(LE.c, na.rm = TRUE)
-      ),
-
-      LE_sd = ifelse(
-        sum(!is.na(LE.c)) < 2,
-        NA_real_,
-        sd(LE.c, na.rm = TRUE)
-      ),
-
-
-      H_mean = ifelse(
-        all(is.na(H.c)),
-        NA_real_,
-        median(H.c, na.rm = TRUE)
-      ),
-
-      H_sd = ifelse(
-        sum(!is.na(H.c)) < 2,
-        NA_real_,
-        sd(H.c, na.rm = TRUE)
-      ),
-
-
-      Rn_mean = ifelse(
-        all(is.na(Rn)),
-        NA_real_,
-        median(Rn, na.rm = TRUE)
-      ),
-
-      Rn_sd = ifelse(
-        sum(!is.na(Rn)) < 2,
-        NA_real_,
-        sd(Rn, na.rm = TRUE)
-      ),
-
-
-      ustar_mean = ifelse(
-        all(is.na(u.)),
-        NA_real_,
-        median(u., na.rm = TRUE)
-      ),
-
-      ustar_sd = ifelse(
-        sum(!is.na(u.)) < 2,
-        NA_real_,
-        sd(u., na.rm = TRUE)
-      ),
-
-      .groups = "drop"
-    )
-}
-
-
-# Monthly diel
-diel_month <- make_diel(
-  df_month,
-  group_cols = c(
-    "year",
-    "month",
-    "hour"
-  )
-)
-
-
-# Weekly diel
-diel_week <- make_diel(
-  df_month,
-  group_cols = c(
-    "year",
-    "month",
-    "week_in_month",
-    "hour"
-  )
-)
-
-
-```
-
-#PLOT DIURNALS - MONTHLY
-
-```{r, echo=F}
-plot_diel <- function(df, value_col, sd_col,
-                      y_label, title,
-                      color = "blue",
-                      week = NULL,
-                      site = "Toolik") {
-
-  if (!is.null(week)) {
-    df <- dplyr::filter(
-      df,
-      week_in_month == week
-    )
-  }
-
-  title <- paste(site, "-", title)
-
-  if (!is.null(week)) {
-    title <- paste(title, "- Week", week)
-  }
-
-  ggplot(df) +
-    geom_hline(
-      yintercept = 0,
-      linetype = "dashed"
-    ) +
-    geom_ribbon(
-      aes(
-        x = hour,
-        ymin = .data[[value_col]] - .data[[sd_col]],
-        ymax = .data[[value_col]] + .data[[sd_col]]
-      ),
-      alpha = 0.2
-    ) +
-    geom_line(
-      aes(
-        x = hour,
-        y = .data[[value_col]]
-      ),
-      color = color,
-      linewidth = 1
-    ) +
-    scale_x_continuous(
-      breaks = seq(0, 23, by = 3)
-    ) +
-    labs(
-      title = title,
-      x = "Hour of Day",
-      y = y_label
-    ) +
-    theme_bw()
-}
-
-
-```
-
 ```{r,echo=FALSE}
 
 # ============================================================
@@ -590,7 +398,6 @@ p_diel_ustar <- plot_diel(
   "Diurnal Friction Velocity",
   color = "darkorange"
 )
-
 
 
 ```

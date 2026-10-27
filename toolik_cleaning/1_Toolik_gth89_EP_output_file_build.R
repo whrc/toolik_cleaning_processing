@@ -17,7 +17,7 @@ library(tidyr)
 ####################################################################
 
 #load in the full output flux data ##################
-fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/2026/'
+fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/2025/'
 #fp = 'C:/Users/klynoe/Documents/pond_inlet/202410_full/eddypro/full_output/2024'
 files = list.files(path = fp,pattern = '*full_output.+csv$',recursive = T,full.names = T)
 
@@ -63,8 +63,8 @@ df$ts <- format(
   as.POSIXct(df$ts, tz = "UTC"),"%Y-%m-%d %H:%M")
 
 # Define date range
-start_date <- as.POSIXct("2026-08-01 00:00:00", tz = "UTC")
-stop_date  <- as.POSIXct("2026-09-30 23:30:00", tz = "UTC")
+start_date <- as.POSIXct("2025-05-01 00:00:00", tz = "UTC")
+stop_date  <- as.POSIXct("2025-12-31 23:30:00", tz = "UTC")
 
 # Filter df using ts
 df <- df[
@@ -80,7 +80,7 @@ df$ts <- format(
 
 
 #save off flux data
-write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202608_202609.csv',row.names = F)
+write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202512.csv',row.names = F)
 
 
 ################multiple met
@@ -123,15 +123,22 @@ df_master[, TIMESTAMP := as.POSIXct(TIMESTAMP, tz = "UTC")]
 print(range(df_master$TIMESTAMP, na.rm = TRUE))
 print(df_master[order(TIMESTAMP)][.N, .(TIMESTAMP)])
 
+met = read.csv("C:/Users/klynoe/Documents/toolik/R_outputs/AllBiomet_202505_202512.csv")
+
+
+met$TIMESTAMP <- format(
+  as.POSIXct(met$TIMESTAMP, tz = "UTC"),"%Y-%m-%d %H:%M")
 
 # 6. Generate a continuous 30-minute time grid starting from your specific date
-start_date <- as.POSIXct("2026-08-01 00:00:00", tz = "UTC")
-stop_date = as.POSIXct("2026-09-30 23:30:00", tz = "UTC")
+start_date <- as.POSIXct("2025-05-01 00:00:00", tz = "UTC")
+stop_date = as.POSIXct("2025-12-31 23:30:00", tz = "UTC")
 ts_grid <- data.frame(TIMESTAMP = seq(
   from = start_date,
   to = stop_date,
   by = 60 * 30
 ))
+
+df = 
 
 # 7. Merge onto grid to reveal NAs where records are missing
 df_master <- merge(ts_grid, df_master, by = "TIMESTAMP", all.x = TRUE)
@@ -219,8 +226,10 @@ tomst_wide <- tomst_wide %>%
 tomst_wide$TIMESTAMP <- as.POSIXct(tomst_wide$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
 
 setDT(DF_1)
+setDT(met_merged)
 setDT(tomst_wide)
 #
+
 
 flux_biomet_tms <- merge(DF_1, tomst_wide, by = "TIMESTAMP", all = TRUE)
 
@@ -245,7 +254,7 @@ flux_biomet_tms[, TIMESTAMP := as.POSIXct(
 # ------------------------------------------------------------
 
 start_date <- as.POSIXct(
-  "2026-03-01 00:00:00",
+  "2025-05-01 00:00:00",
   tz = "UTC"
 )
 
