@@ -40,7 +40,7 @@ Load in eddypro output files
 ```
 
 ```{r, warning=FALSE}
-df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_slump_c_202608_202609.csv')
+df = fread('C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202505_202607.csv')
 
 df[, TIMESTAMP := as.POSIXct(TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")]
 df$ts = df$TIMESTAMP
@@ -51,7 +51,7 @@ df$ts = df$TIMESTAMP
 #Creates a variable to input a date range for the plots in the flux section of
 #cleaning code. Used to easily change date range for different data sets. 
 ```{r, warning=FALSE}
-flux_dates <- c("2026-08-01",'2026-09-30')
+flux_dates <- c("2025-05-01",'2026-07-31')
 ```
 
 #Create Flags
@@ -220,7 +220,14 @@ Plot Tau Histogram
 ```{r, warning=FALSE}
 hist(df$Tau,breaks=100)
 ```
+```{r}
 
+plot(df$TIMESTAMP, df$Tau)
+abline(h = 0.2)
+abline(h = - 0.8)
+
+
+```
 Cut the crazy data and create new variable (Tau.limits)
 
 ```{r, warning=FALSE}
@@ -231,6 +238,9 @@ Tau.limits = replace(df$Tau,df$Tau < -0.8 | df$Tau > .2,NA)
 plot(Tau.limits)
 
 ```
+
+
+
 #SWAP THIS IF RUNNING 7500 DATA PRIOR TO 2026 08
 
 ```{r, include=FALSE}
@@ -402,14 +412,9 @@ Clean based on graphs, create new variable (co2_flux.limits), and see cleaned pr
 
 ```{r, warning=FALSE}
 
-co2_flux.limits = replace(
-  df$co2_flux,
-  df$co2_flux > 20 | df$co2_flux < -20,
-  NA
-)
 
-upper_limit <- 13
-lower_limit <- -13
+upper_limit <- 15
+lower_limit <- -15
 
 limit_fail <- df$co2_flux > upper_limit | df$co2_flux < lower_limit
 
@@ -483,7 +488,7 @@ CH4MOLE = ggplot(data = df)+geom_hline(yintercept = 0)+
  
 
 # Define absolute limits for CH4
-upper_limit_ch4 <- 0.1
+upper_limit_ch4 <- 0.75
 lower_limit_ch4 <- -0.05
 
 # Absolute CH4 limits
@@ -539,15 +544,15 @@ Plot H Histogram and what we might clean
 ```{r, warning=FALSE}
 hist(df$H,breaks=100)
 
-plot(df$ts,df$H,ylim = c(-250,450));abline(h=-150, col= 'red');abline(h=360, col='red')
+plot(df$ts,df$H,ylim = c(-250,450));abline(h=-170, col= 'red');abline(h=240, col='red')
 ```
 
 Clean based on graphs, create new variable (H.limits), and see cleaned product
 
 ```{r, warning=FALSE}
 # Define absolute limits - these will vary greatly depending on time of year
-H_upper <- 200 #did 100 for 7200 not as high
-H_lower <- -150
+H_upper <- 240 #did 100 for 7200 not as high
+H_lower <- -170
 
 # Create a "limited" vector for plotting and filtering
 H.limits <- df$H
@@ -569,7 +574,7 @@ Plot LE Histogram and what we might clean
 ```{r, warning=FALSE}
 hist(df$LE,breaks=100)
 
-plot(df$ts,df$LE,ylim = c(-40,450));abline(h=-40, col= 'red');abline(h=390, col='red')
+plot(df$ts,df$LE,ylim = c(-40,450));abline(h=-40, col= 'red');abline(h=250, col='red')
 ```
 
 Clean based on graphs, create new variable (H.limits), and see cleaned product
@@ -689,7 +694,7 @@ now filter the data based on this signal
 #  ifelse(abs(co2fluxclean - Flux_filt) > (N.summer * roll.mad),NA,co2fluxclean),
  #   ifelse(abs(co2fluxclean - Flux_filt) > (N.winter * roll.mad),NA,co2fluxclean)
 #)
-N = 4
+N = 5
 
 #Add clean value to dataframe (_.c)
 
@@ -1026,7 +1031,7 @@ ggplot(df)+geom_hline(yintercept = 0)+
 Now filter the data based on this signal (N) adjust this to tweak how many MADs to be away from the norm, add clean value to dataframe (_.c) and Compare Clean vs. Uncleaned
 
 ```{r, warning=FALSE}
-N = 4
+N = 5
 
 df$H.c = ifelse(abs(Hclean - Flux_filt) > (N * roll.mad),NA,Hclean)
 
@@ -1316,7 +1321,7 @@ ggplot(data = diel)+geom_hline(yintercept = 0)+
 df <- df[!duplicated(df$TIMESTAMP), ]
 df$TIMESTAMP <- format(as.POSIXct(df$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
 df$ts = format(as.POSIXct(df$ts), format ="%Y-%m-%d %H:%M")
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/flux_c_met_c_slump_c_202608_202609.csv',row.names = F,quote = F)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/flux_c_met_c_202505_202607.csv',row.names = F,quote = F)
 ```
 
 #NEST AND SPLIT THE DATA BY MONTH AND SAVE IN DESIRED DIRECTORY

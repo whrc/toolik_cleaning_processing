@@ -34,7 +34,7 @@ library(dplyr)
 
 ```{r, warning=FALSE}
 
-df = read.csv('C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux/toolik_met_flux_aligned_202505_202512.csv')
+df = read.csv('C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux/toolik_met_flux_aligned_202505_202607.csv')
 sd = read.csv('C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik_gth89_snowdepth.csv')
 
 df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
@@ -72,7 +72,7 @@ df = merge(df,sd,by = 'TIMESTAMP', all.x = T)
 ```
 
 ```{r, warning=FALSE}
-biomet_dates <- c('2025-05-01', '2025-12-31')
+biomet_dates <- c('2025-05-01', '2026-07-31')
 #biomet_dates <- c('2024-10-30', '2024-12-01')
 ```
 
@@ -636,18 +636,24 @@ ggplot(data = df)+
 
 ggplot(data = df)+
   geom_point(aes(TIMESTAMP,PPFD_7_21_1_1_1),col='black')+
-  scale_y_continuous(limits = c(-25,2000),
-                     expression('PAR ('*mu*mol/m^2/s*')'))
+  scale_y_continuous(limits = c(-25,1750),
+                     expression('PAR ('*mu*mol/m^2/s*')'))+
+ geom_hline(yintercept = 1500, col = "red")
  # scale_x_datetime(limits =as.POSIXct(c( '2025-05-01', '2025-12-15'),format="%F"))
 ```
 
 ```{r, warning=FALSE}
 summary(df$PPFD_7_21_1_1_1)
 hist(df$PPFD_7_21_1_1_1,breaks=100)
-plot(df$TIMESTAMP,df$PPFD_7_21_1_1_1,ylim = c(0,1850));abline(h=1750, col= 'red');abline(h=0, col='red')
-PPFD_7_21_1_1_1.limits = replace(df$PPFD_7_21_1_1_1, df$PPFD_7_21_1_1_1 < 0 | df$PPFD_7_21_1_1_1 > 1750,NA)
+plot(df$TIMESTAMP,df$PPFD_7_21_1_1_1,ylim = c(0,1850));abline(h=1650, col= 'red');abline(h=0, col='red')
+PPFD_7_21_1_1_1.limits = replace(df$PPFD_7_21_1_1_1, df$PPFD_7_21_1_1_1 < 0 | df$PPFD_7_21_1_1_1 > 1650,NA)
 hist(PPFD_7_21_1_1_1.limits,breaks=100)
 plot(PPFD_7_21_1_1_1.limits)
+
+
+
+
+
 
 df$PPFD_7_21_1_1_1.c = PPFD_7_21_1_1_1.limits
 ```
@@ -687,8 +693,8 @@ ggplot(data = df)+
 
 ```{r, warning=FALSE}
 hist(df$RN_6_5_1_1_1,breaks=100)
-plot(df$TIMESTAMP,df$RN_6_5_1_1_1,ylim = c(-400,850));abline(h=835,col= 'red');abline(h=-300, col='red')
-RN_6_5_1_1_1.limits = replace(df$RN_6_5_1_1_1, df$RN_6_5_1_1_1 < -300 | df$RN_6_5_1_1_1 > 835,NA)
+plot(df$TIMESTAMP,df$RN_6_5_1_1_1,ylim = c(-400,850));abline(h=600,col= 'red');abline(h=-300, col='red')
+RN_6_5_1_1_1.limits = replace(df$RN_6_5_1_1_1, df$RN_6_5_1_1_1 < -300 | df$RN_6_5_1_1_1 > 600,NA)
 hist(RN_6_5_1_1_1.limits,breaks=100)
 plot(df$TIMESTAMP,RN_6_5_1_1_1.limits)
 df$RN_6_5_1_1_1.c = RN_6_5_1_1_1.limits
@@ -705,8 +711,8 @@ ggplot(data = df)+
 
 ```{r, warning=FALSE}
 hist(df$SWIN_6_10_1_1_1,breaks=100)
-plot(df$TIMESTAMP,df$SWIN_6_10_1_1_1,ylim = c(0,1000));abline(h=900,col= 'red');abline(h=-1, col='red')
-SWIN_6_10_1_1_1.limits <- df$SWIN_6_10_1_1_1
+plot(df$TIMESTAMP,df$SWIN_6_10_1_1_1,ylim = c(0,1000));abline(h=870,col= 'red');abline(h=-1, col='red')
+SWIN_6_10_1_1_1.limits [df$SWIN_6_10_1_1_1 > 870] = NA
 SWIN_6_10_1_1_1.limits[df$SWIN_6_10_1_1_1 < 0] <- 0
 hist(SWIN_6_10_1_1_1.limits,breaks=100)
 plot(df$TIMESTAMP,SWIN_6_10_1_1_1.limits)
@@ -898,8 +904,8 @@ ggplot(data = df)+ theme_bw()+ geom_hline(yintercept = 0)+
   scale_x_datetime(limits = as.POSIXct(biomet_dates))
 
 df$TS_2_38_1_2_1[df$TIMESTAMP == as.POSIXct("2025-12-03 10:00:00")] <- NA # take out bad reading
-df$TS_2_38_2_1_1[df$TIMESTAMP == as.POSIXct("2026-04-28 11:00:00")] <- NA # take out bad reading
-df$TS_2_38_2_1_1[df$TIMESTAMP == as.POSIXct("2026-03-04 15:30:00")] <- NA # take out bad reading
+df$TS_2_38_1_2_1[df$TIMESTAMP == as.POSIXct("2026-04-28 11:00:00")] <- NA # take out bad reading
+df$TS_2_38_1_2_1[df$TIMESTAMP == as.POSIXct("2026-03-04 15:30:00")] <- NA # take out bad reading
 TS_2_38_1_2_1.limits = df$TS_2_38_1_2_1
 
 df$TS_2_38_1_2_1.c = TS_2_38_1_2_1.limits
@@ -927,8 +933,8 @@ ggplot(data = df)+ theme_bw()+ geom_hline(yintercept = 0)+
 # 2. NOW clean the outliers directly from the final combined column (.c)
 # This safely catches both the 2025 and 2026 spikes in one place
 df[TIMESTAMP == as.POSIXct("2025-12-03 10:00:00", tz = "UTC"), TS_2_38_1_3_1 := NA]
-#df[TIMESTAMP == as.POSIXct("2026-04-28 11:00:00", tz = "UTC"), TS_2_38_2_2_1 := NA]
-#df[TIMESTAMP == as.POSIXct("2026-03-04 15:30:00", tz = "UTC"), TS_2_38_2_2_1 := NA]
+df[TIMESTAMP == as.POSIXct("2026-04-28 11:00:00", tz = "UTC"), TS_2_38_1_3_1 := NA]
+df[TIMESTAMP == as.POSIXct("2026-03-04 15:30:00", tz = "UTC"), TS_2_38_1_3_1 := NA]
 
 TS_2_38_1_3_1.limits = df$TS_2_38_1_3_1
 
@@ -985,6 +991,9 @@ df[TIMESTAMP == as.POSIXct("2025-12-03 10:00:00", tz = "UTC"), SWC_12_36_1_1_1 :
 df[TIMESTAMP == as.POSIXct("2025-12-03 10:00:00", tz = "UTC"), SWC_12_36_1_2_1 := NA]
 df[TIMESTAMP == as.POSIXct("2025-12-03 10:00:00", tz = "UTC"), SWC_12_36_1_3_1 := NA]
 
+df[TIMESTAMP == as.POSIXct("2026-04-28 11:00:00", tz = "UTC"), SWC_12_36_1_1_1 := NA]
+df[TIMESTAMP == as.POSIXct("2026-04-28 11:00:00", tz = "UTC"), SWC_12_36_1_2_1 := NA]
+df[TIMESTAMP == as.POSIXct("2026-04-28 11:00:00", tz = "UTC"), SWC_12_36_1_3_1 := NA]
 
 ```
 
@@ -1128,7 +1137,7 @@ df <- df[!duplicated(df$TIMESTAMP), ]
 
 df$TIMESTAMP <- format(as.POSIXct(df$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
 df$ts = format(as.POSIXct(df$ts), format ="%Y-%m-%d %H:%M")
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202505_202512.csv',row.names = F,quote = T)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202505_202607.csv',row.names = F,quote = T)
 
 ```
 

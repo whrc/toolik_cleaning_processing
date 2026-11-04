@@ -17,7 +17,7 @@ library(tidyr)
 ####################################################################
 
 #load in the full output flux data ##################
-fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/2025/'
+fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/first_annual/'
 #fp = 'C:/Users/klynoe/Documents/pond_inlet/202410_full/eddypro/full_output/2024'
 files = list.files(path = fp,pattern = '*full_output.+csv$',recursive = T,full.names = T)
 
@@ -63,8 +63,8 @@ df$ts <- format(
   as.POSIXct(df$ts, tz = "UTC"),"%Y-%m-%d %H:%M")
 
 # Define date range
-start_date <- as.POSIXct("2025-05-01 00:00:00", tz = "UTC")
-stop_date  <- as.POSIXct("2025-12-31 23:30:00", tz = "UTC")
+start_date <- as.POSIXct("2025-05-06 11:00:00", tz = "UTC")
+stop_date  <- as.POSIXct("2026-07-31 23:30:00", tz = "UTC")
 
 # Filter df using ts
 df <- df[
@@ -80,7 +80,7 @@ df$ts <- format(
 
 
 #save off flux data
-write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202512.csv',row.names = F)
+write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_202505_202607.csv',row.names = F)
 
 
 ################multiple met
@@ -88,7 +88,7 @@ write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_2025
 
 
 # 1. Find all AllBiomet files, including the base filename
-fp <- "C:/Users/klynoe/Documents/toolik/raw_data/met/2026"
+fp <- "C:/Users/klynoe/Documents/toolik/raw_data/met/annual_met"
 
 files <- list.files(
   path = fp,
