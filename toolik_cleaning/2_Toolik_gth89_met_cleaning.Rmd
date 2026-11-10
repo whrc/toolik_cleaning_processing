@@ -34,45 +34,22 @@ library(dplyr)
 
 ```{r, warning=FALSE}
 
-df = read.csv('C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux/toolik_met_flux_aligned_202505_202607.csv')
-sd = read.csv('C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik_gth89_snowdepth.csv')
+df = read.csv('C:/Users/klynoe/Documents/toolik/R_outputs/met_and_flux/toolik_flux_met_rpot_20261001_20261031.csv')
+#sd = read.csv('C:/Users/klynoe/Documents/toolik/R_outputs/met/toolik_gth89_snowdepth.csv')
 
 df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
-sd$TIMESTAMP <- as.POSIXct(sd$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
+#sd$TIMESTAMP <- as.POSIXct(sd$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
 #df$ts <- as.POSIXct(df$ts, format = "%Y-%m-%d %H:%M", tz = "UTC")
 # Replace specific missing value indicators with NA
 df[df == -9999] <- NA
 df[df == -7999] <- NA
 #df[df == is.nan] = NA
 
-#timestamp_cutoff <- as.POSIXct("2025-05-01 14:00", format = "%Y-%m-%d %H:%M", tz = "UTC")
-#df <- df %>%
-#  dplyr::filter(TIMESTAMP >= timestamp_cutoff)
-
-
-# Create a complete sequence of timestamps at 30-minute intervals
-tsdf <- data.frame(TIMESTAMP = seq(
-  from = min(df$TIMESTAMP),
-  to = max(df$TIMESTAMP),
-  by = 60*30
-))
-
-
-
-
-df = merge(tsdf,df,by = 'TIMESTAMP',all.x = T)
-
-
-df = merge(df,sd,by = 'TIMESTAMP', all.x = T)
-
-
-
-#summary(df)
 
 ```
 
 ```{r, warning=FALSE}
-biomet_dates <- c('2025-05-01', '2026-07-31')
+biomet_dates <- c('2026-10-01', '2026-10-31')
 #biomet_dates <- c('2024-10-30', '2024-12-01')
 ```
 
@@ -104,7 +81,17 @@ plot(df$TIMESTAMP,df$TA_2_1_1_1_1,ylim = c(-50,50));abline(h=-50, col= 'red');ab
 TA_2_1_1_1_1.limits = replace(df$TA_2_1_1_1_1, df$TA_2_1_1_1_1 < -50 | df$TA_2_1_1_1_1 > 50,NA)
 hist(TA_2_1_1_1_1.limits,breaks=100)
 plot(TA_2_1_1_1_1.limits)
+```
 
+#filter out bad data
+```{r, warning=FALSE}
+
+
+
+```
+
+#make .c and plot
+```{r}
 df$TA_2_1_1_1_1.c = TA_2_1_1_1_1.limits
 
 df$TA_2_1_1_1_1.c[ df$TIMESTAMP %between% as.POSIXct(
@@ -243,11 +230,6 @@ hist(df$max_wind_speed, breaks = 50)
 #hist(df$WD_20_35_1_1_1, breaks = 100)
 hist(df$wind_dir, breaks = 100)
 
-
-
-
-
-
 ```
 
 
@@ -301,7 +283,7 @@ shf1_end <- as.POSIXct(
 df$SHF_6_37_1_1_1.c <- df$SHF_6_37_1_1_1
 
 df$SHF_6_37_1_1_1.c[
-  df$SHF_6_37_1_1_1 < -55 |
+  df$SHF_6_37_1_1_1 < -100 |
   df$SHF_6_37_1_1_1 > 190 |
   df$TIMESTAMP < cutoff_time |
   (
@@ -315,7 +297,7 @@ df$SHF_6_37_1_1_1.c[
 # -------------------------------
 hist(df$SHF_6_37_1_1_1.c, breaks = 100)
 
-plot(df$TIMESTAMP, df$SHF_6_37_1_1_1.c, type = "l", ylim = c(-50, 200))
+plot(df$TIMESTAMP, df$SHF_6_37_1_1_1.c, type = "l", ylim = c(-150, 200))
 abline(h = -55, col = "red")
 abline(h = 190, col = "red")
 abline(v = cutoff_time, col = "blue", lty = 2) # show cutoff
@@ -348,7 +330,7 @@ shf2_end <- as.POSIXct(
 df$SHF_6_37_2_1_1.c <- df$SHF_6_37_2_1_1
 
 df$SHF_6_37_2_1_1.c[
-  df$SHF_6_37_2_1_1 < -75 |
+  df$SHF_6_37_2_1_1 < -100 |
   df$SHF_6_37_2_1_1 > 150 |
   df$TIMESTAMP < cutoff_time |
   (
@@ -362,7 +344,7 @@ df$SHF_6_37_2_1_1.c[
 # -------------------------------
 hist(df$SHF_6_37_2_1_1.c, breaks = 100)
 
-plot(df$TIMESTAMP, df$SHF_6_37_2_1_1.c, type = "l", ylim = c(-80, 165))
+plot(df$TIMESTAMP, df$SHF_6_37_2_1_1.c, type = "l", ylim = c(-100, 165))
 abline(h = -75, col = "red")
 abline(h = 150, col = "red")
 abline(v = cutoff_time, col = "blue", lty = 2) # Now active to show cutoff line
@@ -376,7 +358,7 @@ ggplot(data = df)+
   geom_point(aes(TIMESTAMP,SHF_6_37_1_1_1.c,col='SHF 1'))+
   geom_point(aes(TIMESTAMP,SHF_6_37_2_1_1.c,col='SHF 2'))+
  
-  scale_y_continuous(limits = c(-30,100),
+  scale_y_continuous(limits = c(-100,100),
                      expression ('Soil Heat Flux ('*W/m^2*')'))+
   scale_color_manual(values = c('red','black','brown'))+
   scale_x_datetime(limits = as.POSIXct(biomet_dates))
@@ -532,12 +514,14 @@ SD_10_99_1_1_1.limits <-
     SD_10_99_1_1_1.limits
   )
 
+```
 
+```{r, warning=F}
 # ============================================================
 # FINAL CLEANED SNOW DEPTH
 # ============================================================
 
-df$SD_10_99_1_1_1.c <- SD_10_99_1_1_1.limits
+#SD_10_99_1_1_1.limits <- df$SD_10_99_1_1_1
 
 ```
 
@@ -577,7 +561,7 @@ ggplot(df)+geom_hline(yintercept = 0)+
 
 ```{r,  warning=FALSE}
 #adjust this value (N) to tweak how many MADs to be away from the norm
-N = 3
+N = 4
 
 #Add clean value to dataframe (_.c)
 
@@ -694,7 +678,7 @@ ggplot(data = df)+
 ```{r, warning=FALSE}
 hist(df$RN_6_5_1_1_1,breaks=100)
 plot(df$TIMESTAMP,df$RN_6_5_1_1_1,ylim = c(-400,850));abline(h=600,col= 'red');abline(h=-300, col='red')
-RN_6_5_1_1_1.limits = replace(df$RN_6_5_1_1_1, df$RN_6_5_1_1_1 < -300 | df$RN_6_5_1_1_1 > 600,NA)
+RN_6_5_1_1_1.limits = replace(df$RN_6_5_1_1_1, df$RN_6_5_1_1_1 < -300 | df$RN_6_5_1_1_1 > 200,NA)
 hist(RN_6_5_1_1_1.limits,breaks=100)
 plot(df$TIMESTAMP,RN_6_5_1_1_1.limits)
 df$RN_6_5_1_1_1.c = RN_6_5_1_1_1.limits
@@ -711,8 +695,9 @@ ggplot(data = df)+
 
 ```{r, warning=FALSE}
 hist(df$SWIN_6_10_1_1_1,breaks=100)
-plot(df$TIMESTAMP,df$SWIN_6_10_1_1_1,ylim = c(0,1000));abline(h=870,col= 'red');abline(h=-1, col='red')
-SWIN_6_10_1_1_1.limits [df$SWIN_6_10_1_1_1 > 870] = NA
+plot(df$TIMESTAMP,df$SWIN_6_10_1_1_1,ylim = c(0,1000));abline(h=350,col= 'red');abline(h=-1, col='red')
+SWIN_6_10_1_1_1.limits = df$SWIN_6_10_1_1_1
+SWIN_6_10_1_1_1.limits [df$SWIN_6_10_1_1_1 > 350] = NA
 SWIN_6_10_1_1_1.limits[df$SWIN_6_10_1_1_1 < 0] <- 0
 hist(SWIN_6_10_1_1_1.limits,breaks=100)
 plot(df$TIMESTAMP,SWIN_6_10_1_1_1.limits)
@@ -979,7 +964,7 @@ ggplot(data = df) +
   geom_point(aes(TIMESTAMP, SWC_12_36_1_2_1 * 100, col = 'SWC 18cm')) + 
   geom_point(aes(TIMESTAMP, SWC_12_36_1_3_1 * 100, col = 'SWC 28cm')) + 
   scale_y_continuous(limits = c(0, 100), name = expression('% VWC')) + 
-  scale_x_datetime(limits = as.POSIXct(c("2025-12-01 06:00:00","2025-12-10 13:00:00"))) + 
+ # scale_x_datetime(limits = as.POSIXct(c("2025-12-01 06:00:00","2025-12-10 13:00:00"))) + 
   theme_bw()
 
 ```
@@ -1137,7 +1122,7 @@ df <- df[!duplicated(df$TIMESTAMP), ]
 
 df$TIMESTAMP <- format(as.POSIXct(df$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
 df$ts = format(as.POSIXct(df$ts), format ="%Y-%m-%d %H:%M")
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202505_202607.csv',row.names = F,quote = T)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_20261001_20261031.csv',row.names = F,quote = T)
 
 ```
 

@@ -17,7 +17,7 @@ library(tidyr)
 ####################################################################
 
 #load in the full output flux data ##################
-fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/first_annual/'
+fp = 'C:/Users/klynoe/Documents/toolik/eddypro_output/2026/7200/'
 #fp = 'C:/Users/klynoe/Documents/pond_inlet/202410_full/eddypro/full_output/2024'
 files = list.files(path = fp,pattern = '*full_output.+csv$',recursive = T,full.names = T)
 
@@ -88,7 +88,7 @@ write.csv(df,'C:/Users/klynoe/Documents/toolik/R_outputs/flux/toolik_fluxes_2025
 
 
 # 1. Find all AllBiomet files, including the base filename
-fp <- "C:/Users/klynoe/Documents/toolik/raw_data/met/annual_met"
+fp <- "C:/Users/klynoe/Documents/toolik/raw_data/met/2026/"
 
 files <- list.files(
   path = fp,

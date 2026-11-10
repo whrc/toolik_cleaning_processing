@@ -43,7 +43,7 @@ library(RColorBrewer)
 #DATA LOADER AND FLAGS
 ```{r, include = FALSE}
 
-df <- fread('./toolik_flux_c_met_c_tms_2025_2026.csv')
+df <- fread('./flux_c_met_c_202505_202607.csv')
 
 #df$ts <- df$ts-9*3600 #adjust timezone from UTC to CST
 #df$TIMESTAMP <- df$TIMESTAMP-9*3600 #adjust timezone from UTC to CST
@@ -55,404 +55,346 @@ df$TIMESTAMP <- as.POSIXct( paste(df$TIMESTAMP, "00:00"), format = "%Y-%m-%d %H:
 # Ensure flags are character first
 df$co2_flux.flag <- as.character(df$co2_flux.flag)
 df$ch4_flux.flag <- as.character(df$ch4_flux.flag)
+df$LE.flag <- as.character(df$LE.flag)
+df$H.flag <- as.character(df$H.flag)
 
 # Then assign factor with explicit levels
-df$co2_flux.flag <- factor(df$co2_flux.flag, levels = c("0","1","2","3","4","5"))
-df$ch4_flux.flag <- factor(df$ch4_flux.flag, levels = c("0","1","2","3","4","5"))
-
+df$co2_flux.flag <- factor(df$co2_flux.flag, levels = c("2","3","4","5"))
+df$ch4_flux.flag <- factor(df$ch4_flux.flag, levels = c("2","3","4","5"))
+df$LE.flag <- factor(df$LE.flag, levels = c("2","3","4","5"))
+df$H.flag <- factor(df$H.flag, levels = c("2","3","4","5"))
 #df$co2_flux.flag <- as.factor(df$co2_flux.flag)
 #df$ch4_flux.flag <- as.factor(df$ch4_flux.flag)
 
-color_map = c("0" = "yellow3", "1" = "darkblue" , "2" =  "red4", "3" = "orange", "4" = "green4", "5" = "purple")
+color_map = c( "2" =  "red4", "3" = "orange", "4" = "green4", "5" = "purple")
 
 ```
 
 
 # Timeseries Plots
 
-Flag = 0, 1, 2 : EP Flag
+Flag = 2 : EP Flag
 Flag = 3 : Absolute Limits Filter
 Flag = 4 : Rolling MAD Filter
 Flag = 5 : Diagnostic filter
 
-# ANNUAL PLOT CO2
+
 ```{r, warning=FALSE}
-# Flag = 0, 1, 2 : EP Flag
-# Flag = 3 : Absolute Limits Filter
-# Flag = 4 : Rolling MAD Filter
-# Flag = 5 : Diagnostic filter
+plot_variable <- function(df, variable, clean_col, flag_col,
+                          y_limits, y_label, color_map) {
 
-# -------------------------------
-# NEE Plot with Monthly Ticks
-# -------------------------------
-nee_plot_ytd <- ggplot(data = df) +
-  geom_hline(yintercept = 0) +
-  geom_point(
-    data = subset(df, !is.na(co2_flux.flag)),
-    aes(TIMESTAMP, co2_flux, color = co2_flux.flag)
-  ) +
-  geom_point(aes(TIMESTAMP, co2_flux.c), col = 'black') +
-  scale_y_continuous(limits = c(-30, 30)) +
-  scale_x_datetime(
-    date_breaks = "1 month",
-    date_labels = "%b"
-  ) +
-  labs(
-    title = "Toolik",
-    x = "Month",
-    y = bquote(CO[2]~"Flux ("*mu*"mol m"^-2~"s"^-1*")")
-  ) +
-  scale_color_manual(values = color_map, name = "Cleaning Flag") +
-  theme_bw() +
-  theme(
-    plot.title = element_text(hjust = 0.5),
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  )
+  # -----------------------------
+  # TOTAL OVERVIEW
+  # -----------------------------
 
-nee_plot_ytd
+  p <- ggplot(df) +
+    geom_hline(yintercept = 0) +
 
-
-```
-# MONTHLY CO2
-
-```{r}
-
-# 1. Extract both month and year from TIMESTAMP
-df <- df %>% 
-  mutate(
-    month = as.numeric(format(TIMESTAMP, "%m")),
-    year  = as.numeric(format(TIMESTAMP, "%Y"))
-  )
-
-# 2. Get unique combinations of year and month, sorted chronologically
-time_blocks <- df %>% 
-  distinct(year, month) %>% 
-  arrange(year, month)
-
-# 3. Loop through each specific year and month combination
-for (i in 1:nrow(time_blocks)) {
-  current_year  <- time_blocks$year[i]
-  current_month <- time_blocks$month[i]
-  
-  # Filter data for the specific year and month
-  df_month <- df %>% 
-    filter(year == current_year & month == current_month)
-  
-  # CRITICAL UPDATE: Skip if column doesn't exist, is empty, or contains ONLY NA values
-  if (!"co2_flux.c" %in% names(df_month) || nrow(df_month) == 0 || all(is.na(df_month$co2_flux.c))) {
-    next
-  }
-  
-  # Generate the plot
-  p <- ggplot(data = df_month) + 
-    geom_hline(yintercept = 0) + 
     geom_point(
-      data = subset(df_month, !is.na(co2_flux.flag)), 
-      aes(TIMESTAMP, co2_flux, color = co2_flux.flag), 
+      data = df[!is.na(df[[flag_col]]), ],
+      aes(
+        x = TIMESTAMP,
+        y = .data[[variable]],
+        color = .data[[flag_col]]
+      ),
       alpha = 0.7
-    ) + 
+    ) +
+
     geom_point(
-      aes(TIMESTAMP, co2_flux.c), 
-      color = 'black', 
+      aes(
+        x = TIMESTAMP,
+        y = .data[[clean_col]]
+      ),
+      color = "black",
       alpha = 0.7
-    ) + 
-    scale_y_continuous(limits = c(-30, 30)) + 
-    scale_color_manual(values = color_map, name = "Cleaning Flag") + 
+    ) +
+
+    scale_y_continuous(limits = y_limits) +
+    scale_color_manual(values = color_map, name = "Cleaning Flag") +
+
     labs(
-      # Updated title to dynamically show both Month and Year
-      title = bquote(CO[2]~"Flux — " * .(current_month) * "/" * .(current_year)), 
-      x = "Time", 
-      y = expression(paste(CO[2], " Flux (µmol m"^-2," s"^-1,")"))
-    ) + 
-    theme_bw() + 
+      title = paste(variable, "Toolik - Total Overview"),
+      x = "Time",
+      y = y_label
+    ) +
+
+    theme_bw() +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1)
     )
-  
+
   print(p)
-}
-
-```
 
 
-```{r, warning=FALSE}
+  # -----------------------------
+  # MONTHLY PLOTS
+  # -----------------------------
 
-
-
-```
-
-
-#### ANNUAL CH4
-```{r, warning=FALSE, echo=FALSE}
-
-# Flag = 0, 1, 2 : EP Flag
-# Flag = 3 : Absolute Limits Filter
-# Flag = 4 : Rolling MAD Filter
-# Flag = 5 : Diagnostic filter
-
-ch4_plot_ytd <- ggplot(data = df) +
-  geom_hline(yintercept = 0) +
-  
-  # QC flagged points
-  geom_point(
-    data = subset(df, !is.na(ch4_flux.flag)),
-    aes(TIMESTAMP, ch4_flux, color = ch4_flux.flag),
-    alpha = 0.7
-  ) +
-  
-  # Corrected CH4 points
-  geom_point(aes(TIMESTAMP, ch4_flux.c), col = 'black', alpha = 0.7) +
-  
-  # Y-axis limits
-  scale_y_continuous(limits = c(-0.1, 0.33)) +
-  
-  # X-axis monthly ticks
-  scale_x_datetime(
-    date_breaks = "1 month",
-    date_labels = "%b"
-  ) +
-  
-  # QC color mapping
-  scale_color_manual(values = color_map, name = "QC CH4 Flux") +
-  
-  # Labels
-  labs(
-    title = "Toolik",
-    x = "Month",
-    y = bquote(CH[4]~"Flux ("*mu*"mol m"^-2~"s"^-1*")")
-  ) +
-  
-  theme_bw() +
-  theme(
-    plot.title = element_text(hjust = 0.5),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "right"
+  time_blocks <- unique(
+    data.frame(
+      year = format(df$TIMESTAMP, "%Y"),
+      month = format(df$TIMESTAMP, "%m")
+    )
   )
 
-ch4_plot_ytd
+  time_blocks <- time_blocks[order(time_blocks$year,
+                                   time_blocks$month), ]
 
+  for (i in 1:nrow(time_blocks)) {
 
-```
+    current_year  <- time_blocks$year[i]
+    current_month <- time_blocks$month[i]
 
-#CH4 MONTHLY
+    df_month <- df[
+      format(df$TIMESTAMP, "%Y") == current_year &
+      format(df$TIMESTAMP, "%m") == current_month,
+    ]
 
-```{r, warning=FALSE}
+    if (nrow(df_month) == 0 ||
+        all(is.na(df_month[[clean_col]]))) {
+      next
+    }
 
-# 1. Add month and year columns if they are not already present
-if (!"month" %in% names(df)) {
-  df <- df %>% mutate(month = as.numeric(format(TIMESTAMP, "%m")))
-}
-if (!"year" %in% names(df)) {
-  df <- df %>% mutate(year = as.numeric(format(TIMESTAMP, "%Y")))
-}
+    p <- ggplot(df_month) +
+      geom_hline(yintercept = 0) +
 
-# 2. Get unique combinations of year and month, sorted chronologically
-time_blocks <- df %>% 
-  distinct(year, month) %>% 
-  arrange(year, month)
+      geom_point(
+        data = df_month[!is.na(df_month[[flag_col]]), ],
+        aes(
+          x = TIMESTAMP,
+          y = .data[[variable]],
+          color = .data[[flag_col]]
+        ),
+        alpha = 0.7
+      ) +
 
-# 3. Loop: print separate plot for each year and month combination
-for (i in 1:nrow(time_blocks)) {
-  current_year  <- time_blocks$year[i]
-  current_month <- time_blocks$month[i]
-  
-  # Filter data for this specific year and month
-  df_month <- df %>% 
-    filter(year == current_year & month == current_month)
-  
-  # CRITICAL UPDATE: Skip if column doesn't exist, is empty, or contains ONLY NA values
-  if (!"ch4_flux.c" %in% names(df_month) || nrow(df_month) == 0 || all(is.na(df_month$ch4_flux.c))) {
-    next
+      geom_point(
+        aes(
+          x = TIMESTAMP,
+          y = .data[[clean_col]]
+        ),
+        color = "black",
+        alpha = 0.7
+      ) +
+
+      scale_y_continuous(limits = y_limits) +
+      scale_color_manual(values = color_map, name = "Cleaning Flag") +
+
+      labs(
+        title = paste(variable, "Toolik -", current_month, "/", current_year),
+        x = "Time",
+        y = y_label
+      ) +
+
+      theme_bw() +
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1)
+      )
+
+    print(p)
   }
-  
-  p <- ggplot(data = df_month) + 
-    geom_hline(yintercept = 0) + 
-    geom_point(
-      data = subset(df_month, !is.na(ch4_flux.flag)), 
-      aes(TIMESTAMP, ch4_flux, color = ch4_flux.flag), 
-      alpha = 0.7
-    ) + 
-    geom_point(
-      aes(TIMESTAMP, ch4_flux.c), 
-      color = "black", 
-      alpha = 0.7
-    ) + 
-    # scale_y_continuous(limits = c(-0.1, 0.1)) + 
-    scale_color_manual(values = color_map, name = "QC CH4 Flux") + 
-    labs(
-      # Updated title to explicitly display both Month and Year
-      title = bquote(CH[4]~"Flux — " * .(current_month) * "/" * .(current_year)), 
-      x = "Time", 
-      y = expression(paste(CH[4], " Flux (µmol m"^-2," s"^-1,")"))
-    ) + 
-    theme_bw() + 
-    theme(
-      axis.text.x = element_text(angle = 45, hjust = 1)
-    )
-  
-  print(p)
 }
 
 
+```
+
+#  CO2
+```{r, warning=FALSE}
+plot_variable(
+  df, "co2_flux", "co2_flux.c", "co2_flux.flag",
+  c(-30, 30),
+  expression(paste(CO[2], " Flux (µmol m"^-2, " s"^-1, ")")),
+  color_map
+)
 
 ```
 
+
+#CH4
+```{r, warning=FALSE}
+plot_variable(
+  df, "ch4_flux", "ch4_flux.c", "ch4_flux.flag",
+  c(-0.1, 0.2),
+  expression(paste(CH[4], " Flux (µmol m"^-2, " s"^-1, ")")),
+  color_map
+)
+
+
+```
+
+
+#LE
+```{r, warning=FALSE}
+plot_variable(
+  df, "LE", "LE.c", "LE.flag",
+  c(-100, 300),
+  "Latent Heat Flux (W m-2)",
+  color_map
+)
+```
+
+#H
 
 ```{r, warning=FALSE}
-
-
-
+plot_variable(
+  df, "H", "H.c", "H.flag",
+  c(-400, 400),
+  "Sensible Heat Flux (W m-2)",
+  color_map
+)
 ```
 
 
-# ANNUAL EB 
+# MONTHLY EB
+
 ```{r, warning=FALSE}
+# -------------------------------
+# Compute net radiation
+# -------------------------------
+df$Rn <- df$LWIN_6_14_1_1_1.c +
+         df$SWIN_6_10_1_1_1.c -
+         df$LWOUT_6_15_1_1_1.c -
+         df$SWOUT_6_11_1_1_1.c
 
 
-```
+# -------------------------------
+# Compute SHF average
+# -------------------------------
+shf_cols <- c(
+  "SHF_6_37_1_1_1.c",
+  "SHF_6_37_2_1_1.c"
+)
 
-```{r}
-# -------------------------------
-# Compute net radiation safely
-# -------------------------------
-df$Rn <- df$LWIN_6_14_1_1_1.c + df$SWIN_6_10_1_1_1.c -
-         df$LWOUT_6_15_1_1_1.c - df$SWOUT_6_11_1_1_1.c
-
-# -------------------------------
-# Compute SHF safely with fallback
-# -------------------------------
-# Vectorized row-wise handling
-df$shf_avg = rowMeans(
-  df[, c("SHF_6_37_1_1_1.c", "SHF_6_37_2_1_1.c")],
+df$shf_avg <- rowMeans(
+  df[, ..shf_cols],
   na.rm = TRUE
 )
 
-# Replace rows where both SHF were missing
-both_missing <- is.na(df$SHF_6_37_1_1_1.c) & is.na(df$SHF_6_37_2_1_1.c)
-df$shf_avg[both_missing] = 0  # or df$Rn[both_missing] if you want met = 0 when missing
+# Both SHF missing = 0
+both_missing <- is.na(df[[shf_cols[1]]]) &
+                is.na(df[[shf_cols[2]]])
+
+df$shf_avg[both_missing] <- 0
+
 
 # -------------------------------
 # Compute energy balance
 # -------------------------------
-df$met <- df$Rn - df$shf_avg
+df$met  <- df$Rn - df$shf_avg
 df$flux <- df$H.c + df$LE.c
 
-# -------------------------------
-# Fit linear model
-# -------------------------------
-mod <- lm(flux ~ met, data = df)
-summary_mod <- summary(mod)
-
-slope <- coef(mod)["met"]
-r2 <- summary_mod$r.squared
-
-cat("Slope:", round(slope,3), "\nR²:", round(r2,3), "\n")
 
 # -------------------------------
-# Plot
+# Extract year and month
+# -------------------------------
+df$year  <- as.numeric(format(df$TIMESTAMP, "%Y"))
+df$month <- as.numeric(format(df$TIMESTAMP, "%m"))
+
+
+# -------------------------------
+# Filter valid observations
+# -------------------------------
+df_plot <- df[
+  !is.na(df$year) &
+  !is.na(df$month) &
+  is.finite(df$met) &
+  is.finite(df$flux),
+]
+
+
+# -------------------------------
+# Plot settings
 # -------------------------------
 x_lim <- c(-200, 500)
 y_lim <- c(-200, 500)
 
-eb_ytd <- ggplot(df, aes(x = met, y = flux)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", color = "blue", se = FALSE) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
-  geom_hline(yintercept = 0, linetype = "solid", color = "black") +
-  geom_vline(xintercept = 0, linetype = "solid", color = "black") +
-  coord_fixed(ratio = 1, xlim = x_lim, ylim = y_lim) +
-  labs(
-    x = expression("Rn - G  (W m"^-2*")"),
-    y = expression("H + LE  (W m"^-2*")"),
-    title = "Toolik Full Year Energy Balance"
-  ) +
-  annotate(
-    "text",
-    x = max(x_lim), y = min(y_lim),
-    label = paste0("Slope = ", round(slope, 3), "\nR² = ", round(r2, 3)),
-    hjust = 1.1, vjust = -0.5, size = 4
-  ) +
-  theme_bw()
 
-# Print plot
-eb_ytd
-
- 
-
-```
-# MONTHLY EB
-
-```{r, warning=FALSE}
-
-# Add month column if not already present
-if (!"month" %in% names(df)) {
-  df <- df %>% mutate(month = as.numeric(format(TIMESTAMP, "%m")))
-}
-
-# Add year column if not already present
-if (!"year" %in% names(df)) {
-  df <- df %>% mutate(year = as.numeric(format(TIMESTAMP, "%Y")))
-}
-
-# Filter out NAs
-df_plot <- df %>% filter(!is.na(month) & !is.na(flux) & !is.na(met) & !is.na(year))
-
-# Get unique years, sorted chronologically
+# -------------------------------
+# Loop through each year
+# -------------------------------
 unique_years <- sort(unique(df_plot$year))
 
-# Axis limits
-x_lim <- c(-200, 500)
-y_lim <- c(-200, 500)
-
-# Loop through each year
 for (y in unique_years) {
-  
-  # Filter data for the specific year
-  df_year <- df_plot %>% filter(year == y)
-  
-  # Skip this year if there are fewer than 3 data points to fit a line
-  if (nrow(df_year) < 3) {
-    next
-  }
-  
-  # Fit linear model for the specific year
-  mod         <- lm(flux ~ met, data = df_year)
-  summary_mod <- summary(mod)
-  slope       <- coef(mod)["met"]
-  r2          <- summary_mod$r.squared
-  
-  # Print metrics to the console for this year
-  cat("\n--- Year:", y, "---", "\nSlope:", slope, "\nR²:", r2, "\n")
-  
-  # Create plot for this specific year
-  eb_ytd_month <- ggplot(df_year, aes(x = met, y = flux, color = factor(month))) + 
-    geom_point(alpha = 0.7) + 
-    geom_smooth(method = "lm", color = "blue", se = FALSE) + 
-    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") + 
-    geom_hline(yintercept = 0, linetype = "solid", color = "black") + 
-    geom_vline(xintercept = 0, linetype = "solid", color = "black") + 
-    coord_fixed(ratio = 1, xlim = x_lim, ylim = y_lim) + 
-    scale_color_viridis_d(name = "Month", drop = FALSE) + # drop = FALSE keeps all calendar months in the legend scale
+
+  df_year <- df_plot[df_plot$year == y, ]
+
+  # Require at least 3 observations
+  if (nrow(df_year) < 3) next
+
+  # Linear model
+  mod <- lm(flux ~ met, data = df_year)
+
+  slope <- coef(mod)["met"]
+  r2 <- summary(mod)$r.squared
+
+  # Print statistics
+  cat(
+    "\n--- Year:", y, "---",
+    "\nSlope:", round(slope, 3),
+    "\nR²:", round(r2, 3),
+    "\n"
+  )
+
+  # Plot
+  eb_ytd_month <- ggplot(
+    df_year,
+    aes(x = met, y = flux, color = factor(month))
+  ) +
+
+    geom_point(alpha = 0.7) +
+
+    geom_smooth(
+      method = "lm",
+      color = "blue",
+      se = FALSE
+    ) +
+
+    geom_abline(
+      slope = 1,
+      intercept = 0,
+      linetype = "dashed",
+      color = "red"
+    ) +
+
+    geom_hline(yintercept = 0, color = "black") +
+    geom_vline(xintercept = 0, color = "black") +
+
+    coord_fixed(
+      ratio = 1,
+      xlim = x_lim,
+      ylim = y_lim
+    ) +
+
+    scale_color_viridis_d(
+      name = "Month",
+      breaks = as.character(1:12),
+      labels = month.abb,
+      drop = FALSE
+    ) +
+
     labs(
-      x = expression("Rn - G (W m"^-2*")"), 
-      y = expression("H + LE (W m"^-2*")"), 
-      title = paste("Toolik", y, "Energy Balance") # Dynamic year title
-    ) + 
+      x = expression("Rn - G (W m"^-2*")"),
+      y = expression("H + LE (W m"^-2*")"),
+      title = paste("Toolik", y, "Energy Balance")
+    ) +
+
     annotate(
-      "text", 
-      x = max(x_lim), 
-      y = min(y_lim), 
-      label = paste0("Slope = ", round(slope, 3), "\nR² = ", round(r2, 3)), 
-      hjust = 1.1, 
-      vjust = -0.5, 
+      "text",
+      x = max(x_lim),
+      y = min(y_lim),
+      label = paste0(
+        "Slope = ", round(slope, 3),
+        "\nR² = ", round(r2, 3)
+      ),
+      hjust = 1.1,
+      vjust = -0.5,
       size = 4
-    ) + 
+    ) +
+
     theme_bw()
-  
-  # Print the plot for this/each year
+
   print(eb_ytd_month)
 }
-
 
 ```
 # ANNUAL ENERGY FLUX (ATMOSPHERIC)
@@ -460,117 +402,89 @@ for (y in unique_years) {
 ```{r, warning=FALSE}
 
 
-# 1. Ensure time columns and normalized day-of-year axis exist
+# Arrange chronologically
 df <- df %>%
-  arrange(TIMESTAMP) %>% 
+  arrange(TIMESTAMP) %>%
   mutate(
-    year = as.numeric(format(TIMESTAMP, "%Y")),
-    doy_time = as.POSIXct(format(TIMESTAMP, "2000-%m-%d %H:%M:%S"), tz = "UTC")
+    year = as.numeric(format(TIMESTAMP, "%Y"))
   )
 
-# 2. Corrected parameter syntax for zoo::rollapply
+# Calculate 24-hour rolling means (48 x 30-minute observations)
 df <- df %>%
   group_by(year) %>%
   mutate(
-    # Changed k to width, and v to FUN
-    H.smoothed  = zoo::rollapply(H.c,  width = 48, FUN = mean, na.rm = TRUE, fill = NA, partial = FALSE),
-    LE.smoothed = zoo::rollapply(LE.c, width = 48, FUN = mean, na.rm = TRUE, fill = NA, partial = FALSE)
+    H.smoothed = zoo::rollapply(
+      H.c,
+      width = 48,
+      FUN = function(x) mean(x, na.rm = TRUE),
+      fill = NA,
+      partial = FALSE,
+      align = "center"
+    ),
+
+    LE.smoothed = zoo::rollapply(
+      LE.c,
+      width = 48,
+      FUN = function(x) mean(x, na.rm = TRUE),
+      fill = NA,
+      partial = FALSE,
+      align = "center"
+    )
   ) %>%
   ungroup()
 
-# ==============================================================================
-# TYPE 1: ONE SEPARATE PLOT PER YEAR
-# ==============================================================================
-for (y in unique_years) {
-  df_year <- df %>% filter(year == y)
-  
-  if (nrow(df_year %>% filter(!is.na(H.c) | !is.na(LE.c))) < 10) next
-  
-  p_year <- ggplot(df_year) +
-    theme_bw() +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
-    # Raw data lines (slightly transparent)
-    geom_line(aes(x = TIMESTAMP, y = H.c, color = "H"), linewidth = 0.8, alpha = 0.3) +
-    geom_line(aes(x = TIMESTAMP, y = LE.c, color = "LE"), linewidth = 0.8, alpha = 0.3) +
-    # Pre-calculated smoothed lines (will naturally break at large NA blocks)
-    geom_line(aes(x = TIMESTAMP, y = H.smoothed, color = "H"), linewidth = 1, na.rm = FALSE) +
-    geom_line(aes(x = TIMESTAMP, y = LE.smoothed, color = "LE"), linewidth = 1, na.rm = FALSE) +
-    scale_color_manual(
-      name = "Flux",
-      values = c("H" = "firebrick", "LE" = "dodgerblue3")
-    ) +
-    scale_x_datetime(date_breaks = "1 month", date_labels = "%b") +
-    labs(
-      x = "Month",
-      y = expression(Flux~"(W/m"^2*")"),
-      title = paste("H & LE Flux — Year", y)
-    ) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-  
-  print(p_year)
-}
+p_H_LE <- ggplot(df) +
 
-
-# 1. Dynamically build a custom color map for any number of years
-# The 'Paired' palette gives us matching pairs (e.g., Light Blue/Dark Blue, Light Green/Dark Green, etc.)
-unique_years <- sort(unique(df$year))
-num_years    <- length(unique_years)
-base_colors  <- brewer.pal(max(3, num_years * 2), "Paired")
-
-# Map each year to a specific pair of colors
-custom_colors <- c()
-for (idx in 1:num_years) {
-  y <- unique_years[idx]
-  # Assign the light color to H and the dark color to LE for that year
-  custom_colors[paste0(y, "_H")]  <- base_colors[(idx * 2) - 1]
-  custom_colors[paste0(y, "_LE")] <- base_colors[idx * 2]
-}
-
-# ==============================================================================
-# TYPE 2: ALL YEARS COMPARED TOGETHER (REVISED COLOR MAPPING WITH ALPHA)
-# ==============================================================================
-p_compare_years <- ggplot(df) +
   theme_bw() +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
-  
-  # Added alpha = 0.6 to make the overlapping lines semi-transparent
+
+  geom_hline(
+    yintercept = 0,
+    linetype = "dashed",
+    color = "black"
+  ) +
+
+  # Raw H
+ geom_line(
+  aes(x = TIMESTAMP, y = H.c, color = "H"),
+  linewidth = 0.5, alpha = 0.2
+) +
+
   geom_line(
-    aes(x = doy_time, y = H.smoothed, color = interaction(year, "H", sep = "_")), 
-    linewidth = 1, alpha = 0.6, na.rm = FALSE
-  ) +
+  aes(x = TIMESTAMP, y = LE.c, color = "LE"),
+  linewidth = 0.5, alpha = 0.2
+) +
+
+
+  # Smoothed H
   geom_line(
-    aes(x = doy_time, y = LE.smoothed, color = interaction(year, "LE", sep = "_")), 
-    linewidth = 1, alpha = 0.6, na.rm = FALSE
-  ) +
-  
-  # Assign our custom pairs palette directly
-  scale_color_manual(
-    name = "Year & Flux Type",
-    values = custom_colors,
-    # Clean up legend labels from "2025_H" to "2025 H"
-    labels = function(x) gsub("_", " ", x) 
-  ) +
-  
-  # Clean X-axis monthly tracking
+  aes(x = TIMESTAMP, y = H.smoothed, color = "H"),
+  linewidth = 0.9
+) +
+
+  # Smoothed LE
+  geom_line(
+  aes(x = TIMESTAMP, y = LE.smoothed, color = "LE"),
+  linewidth = 0.9
+) +
+
   scale_x_datetime(
-    date_breaks = "1 month", 
-    date_labels = "%b"
+    date_breaks = "1 month",
+    date_labels = "%b\n%Y",
+    timezone = "UTC"
   ) +
+
   labs(
-    x = "Month",
+    x = "Time (UTC)",
     y = expression(Flux~"(W/m"^2*")"),
-    title = "H & LE Flux Multi-Year Comparison"
+    title = "H & LE Flux — Complete Time Series"
   ) +
+
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.key.width = unit(1.2, "cm") # Makes legend easier to distinguish
-  )
+  axis.text.x = element_text(angle = 45, hjust = 1),
+  legend.position = "top"
+)
 
-print(p_compare_years)
-
-
-
-
+print(p_H_LE)
 ```
 
 # ANNUAL LONGWAVE IN/OUT
@@ -852,57 +766,91 @@ print(p_par)
 
 ```{r, warning=FALSE}
 
-### =========================================================================
-
-### 1. Filter Data and Calculate G (Soil Heat Flux) from July 2, 2025 Onward
-
-### =========================================================================
-
 df_filtered <- df %>%
+  dplyr::filter(
+    TIMESTAMP >= as.POSIXct("2025-07-02 00:00:00", tz = "UTC")
+  ) %>%
+  dplyr::arrange(TIMESTAMP) %>%
+  dplyr::mutate(
+    G = rowMeans(
+      cbind(SHF_6_37_1_1_1.c, SHF_6_37_2_1_1.c),
+      na.rm = TRUE
+    ),
+    G = ifelse(is.nan(G), NA_real_, G),
 
-### Trims out all rows prior to July 1, 2025
-
-filter(TIMESTAMP >= as.POSIXct("2025-07-02", tz = "UTC")) %>%
-mutate(G = (SHF_6_37_1_1_1.c + SHF_6_37_2_1_1.c) / 2)
-
-### =========================================================================
-
-### 2. Plot G (Soil Heat Flux)
-
-### =========================================================================
-
+    G.smoothed = zoo::rollapply(
+      G,
+      width = 48,
+      FUN = function(x) mean(x, na.rm = TRUE),
+      fill = NA,
+      partial = FALSE,
+      align = "center"
+    )
+  )
 p2 <- ggplot(df_filtered, aes(x = TIMESTAMP)) +
-geom_line(aes(y = G, color = "Soil Heat Flux"), linewidth = 0.7) +
-scale_y_continuous(
-name = expression(Soil~Heat~Flux~(W/m^2)),
-breaks = scales::pretty_breaks(n = 8),
-expand = expansion(mult = 0.05)
-) +
-scale_color_manual(
-values = c("Soil Heat Flux" = "blue"),
-labels = c("Soil Heat Flux"),
-name = NULL
-) +
 
-### Updated date_labels to include %Y since it's no longer a full generic calendar year
+  # Individual SHF measurements
+  geom_line(
+    aes(y = SHF_6_37_1_1_1.c, color = "SHF 1"),
+    linewidth = 0.5,
+    alpha = 0.6
+  ) +
 
-scale_x_datetime(
-date_breaks = "1 month",
-date_labels = "%b %Y"
-) +
-labs(
-x = "",
-title = "Soil Heat Flux — Post-Installation"
-) +
-theme_minimal() +
-theme(
-axis.title.y = element_text(color = "black"),
-axis.text.x = element_text(angle = 45, hjust = 1),
-legend.position = "top"
-)
+  geom_line(
+    aes(y = SHF_6_37_2_1_1.c, color = "SHF 2"),
+    linewidth = 0.5,
+    alpha = 0.6
+  ) +
 
-p2
+  # Raw mean G
+  geom_line(
+    aes(y = G, color = "Mean G"),
+    linewidth = 0.5,
+    alpha = 0.25
+  ) +
 
+  # Smoothed mean G
+  geom_line(
+    aes(y = G.smoothed, color = "G 24h rolling mean"),
+    linewidth = 1
+  ) +
+
+  scale_y_continuous(
+    name = expression(Soil~Heat~Flux~(W/m^2)),
+    breaks = scales::pretty_breaks(n = 8),
+    expand = expansion(mult = 0.05)
+  ) +
+
+  scale_color_manual(
+    values = c(
+      "SHF 1" = "firebrick",
+      "SHF 2" = "darkgreen",
+      "Mean G" = "blue",
+      "G 24h rolling mean" = "black"
+    ),
+    name = NULL
+  ) +
+
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b %Y",
+    timezone = "UTC"
+  ) +
+
+  labs(
+    x = "",
+    title = "Soil Heat Flux — Individual Measurements and Mean G"
+  ) +
+
+  theme_minimal() +
+
+  theme(
+    axis.title.y = element_text(color = "black"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top"
+  )
+
+print(p2)
 
 ```
 
@@ -917,8 +865,8 @@ p_soil <- ggplot(data = df) +
   theme_bw() +
   geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
   geom_line(aes(x = TIMESTAMP, y = TS_2_38_1_1_1.c, color = "8 cm"), linewidth = 0.8) +
-  geom_line(aes(x = TIMESTAMP, y = TS_2_38_2_1_1.c, color = "18 cm"), linewidth = 0.8) +
-  geom_line(aes(x = TIMESTAMP, y = TS_2_38_2_2_1.c, color = "28 cm"), linewidth = 0.8) +
+  geom_line(aes(x = TIMESTAMP, y = TS_2_38_1_2_1.c, color = "18 cm"), linewidth = 0.8) +
+  geom_line(aes(x = TIMESTAMP, y = TS_2_38_1_3_1.c, color = "28 cm"), linewidth = 0.8) +
   scale_color_manual(
     values = c("8 cm" = "blue", "18 cm" = "green", "28 cm" = "gold3"),
     breaks = c("8 cm", "18 cm", "28 cm"),  # enforce order in legend
@@ -974,20 +922,7 @@ p_soil / p_air
 
 plot_monthly_soil_air <- function(df, tz = "UTC") {
   
-  # 1. Handle sensor name change / historical merge before plotting
-  cutoff_date <- as.POSIXct("2026-05-01 00:00:00", tz = tz)
-  
-  # Ensure the new destination column exists in df, fill with NA if missing
-  if (!"TS_2_38_2_2_1" %in% names(df)) {
-    df$TS_2_38_2_2_1 <- NA
-  }
-  
-  # Merge data: Use old name before cutoff, new name after cutoff
-  # Using if_else handles POSIXct/numeric classes more strictly than ifelse
-  df <- df %>%
-    mutate(
-      TS_2_38_2_2_1 = if_else(TIMESTAMP <= cutoff_date, TS_2_38_23_1_1, TS_2_38_2_2_1)
-    )
+  #
   
   # 2. Add month and year columns if they are not already present
   if (!"month" %in% names(df)) {
@@ -1009,11 +944,11 @@ plot_monthly_soil_air <- function(df, tz = "UTC") {
     
     # Filter data for this specific year and month
     df_month <- df %>% 
-      filter(year == current_year & month == current_month)
+      dplyr::filter(year == current_year & month == current_month)
     
     # Check if ALL soil and air temperature columns are entirely NA in this block
     # (Updated to check the newly merged TS_2_38_2_2_1 column)
-    temp_cols <- c("TS_2_38_1_1_1.c", "TS_2_38_2_1_1.c", "TS_2_38_2_2_1", "TA_2_1_1_1_1.c")
+    temp_cols <- c("TS_2_38_1_1_1.c", "TS_2_38_1_2_1.c", "TS_2_38_1_3_1", "TA_2_1_1_1_1.c")
     valid_cols <- intersect(temp_cols, names(df_month))
     
     if (nrow(df_month) == 0 || (length(valid_cols) > 0 && all(sapply(df_month[valid_cols], function(x) all(is.na(x)))))) {
@@ -1031,12 +966,12 @@ plot_monthly_soil_air <- function(df, tz = "UTC") {
         linewidth = 0.8, na.rm = FALSE
       ) + 
       geom_line(
-        aes(x = TIMESTAMP, y = TS_2_38_2_1_1.c, color = "18 cm"), 
+        aes(x = TIMESTAMP, y = TS_2_38_1_2_1.c, color = "18 cm"), 
         linewidth = 0.8, na.rm = FALSE
       ) + 
       # UPDATED: Now plotting the newly consolidated 28 cm column
       geom_line(
-        aes(x = TIMESTAMP, y = TS_2_38_2_2_1, color = "28 cm"), 
+        aes(x = TIMESTAMP, y = TS_2_38_1_3_1, color = "28 cm"), 
         linewidth = 0.8, na.rm = FALSE
       ) + 
       scale_color_manual(
@@ -1100,8 +1035,8 @@ p_swc_timeseries <- ggplot(df) +
   
   # Plot all depths over the true, continuous chronological TIMESTAMP axis
   geom_line(aes(x = TIMESTAMP, y = SWC_12_36_1_1_1.c * 100, color = "8 cm"), linewidth = 0.8, na.rm = FALSE) + 
-  geom_line(aes(x = TIMESTAMP, y = SWC_12_36_2_1_1.c * 100, color = "18 cm"), linewidth = 0.8, na.rm = FALSE) + 
-  geom_line(aes(x = TIMESTAMP, y = SWC_12_36_3_1_1.c * 100, color = "28 cm"), linewidth = 0.8, na.rm = FALSE) + 
+  geom_line(aes(x = TIMESTAMP, y = SWC_12_36_1_2_1.c * 100, color = "18 cm"), linewidth = 0.8, na.rm = FALSE) + 
+  geom_line(aes(x = TIMESTAMP, y = SWC_12_36_1_3_1.c * 100, color = "28 cm"), linewidth = 0.8, na.rm = FALSE) + 
   
   # Map colors cleanly to soil depths
   scale_color_manual(
@@ -1288,7 +1223,7 @@ print(p_annual)
 
 # 1. Ensure clean time extraction columns exist with string names
 df <- df %>%
-  mutate(
+  dplyr::mutate(
     month      = as.numeric(format(TIMESTAMP, "%m")),
     year       = as.numeric(format(TIMESTAMP, "%Y")),
     month_name = factor(month, levels = 1:12, labels = month.abb)
@@ -1298,7 +1233,7 @@ df <- df %>%
 timeline_blocks <- df %>%
   distinct(year, month_name) %>%
   arrange(year, month_name) %>%
-  filter(!is.na(month_name))
+  dplyr::filter(!is.na(month_name))
 
 # 3. Loop: print separate plot for each distinct month-year window
 for (i in 1:nrow(timeline_blocks)) {
@@ -1307,7 +1242,7 @@ for (i in 1:nrow(timeline_blocks)) {
   
   # Filter data for this specific chronological block
   df_month <- df %>% 
-    filter(year == current_year, month_name == current_month)
+    dplyr::filter(year == current_year, month_name == current_month)
   
   # Skip completely empty months or chunks filled only with NAs
   if (nrow(df_month) == 0 || (all(is.na(df_month$TA_2_1_1_1_1.c)) && all(is.na(df_month$sonic_temperature)))) {
@@ -1406,54 +1341,72 @@ print(p_albedo)
 ```
 # ANNUAL SNOW DEPTH
 
-```{r, warning=FALSE, include=FALSE}
-# -------------------------------
-# Prepare snow depth
-# -------------------------------
-df_sd <- df %>%
-  filter(!is.na(SD_10_99_1_1_1)) %>%
-  mutate(
-    SD_cm = (SD_10_99_1_1_1 - (-2.06)) * 10  # adjust and convert to cm
-  )
+```{r, warning=FALSE, echo=FALSE}
+
 
 # -------------------------------
 # Annual plot of snow depth
 # -------------------------------
-p_sd_annual <- ggplot(df_sd, aes(x = TIMESTAMP, y = SD_cm)) +
-  geom_point(alpha = 0.4, color = "gray") +  # raw data
-  geom_smooth(method = "loess", span = 0.051, color = "darkblue", se = FALSE) +  # smooth trend
+
+df_sd_smooth <- df %>%
+  dplyr::arrange(TIMESTAMP) %>%
+  dplyr::mutate(
+    segment = cumsum(
+      c(TRUE, diff(as.numeric(TIMESTAMP)) > 90 * 60)
+    )
+  )
+
+p_sd_annual <- ggplot(
+  df_sd_smooth,
+  aes(x = TIMESTAMP, y = SD_10_99_1_1_1.c)
+) +
+  geom_point(alpha = 0.4, color = "gray") +
+  geom_smooth(
+    aes(group = segment),
+    method = "loess",
+    span = 0.051,
+    color = "darkblue",
+    se = FALSE
+  ) +
   scale_y_continuous(name = "Snow Depth (cm)") +
-  labs(
-    x = "",
-    title = "Snow Depth — Annual"
-  ) +
-   scale_x_datetime(
+  scale_x_datetime(
     date_breaks = "1 month",
-    date_labels = "%b"
+    date_labels = "%b-%Y",
+    timezone = "UTC"
   ) +
+  labs(x = "", title = "Snow Depth — Annual") +
   theme_minimal() +
   theme(
-    axis.title.y = element_text(color = "black")
+    axis.title.y = element_text(color = "black"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
 p_sd_annual
 
+p_sd_annual <- ggplot(df, aes(x = TIMESTAMP, y = SD_10_99_1_1_1.c)) +
+  geom_point(alpha = 0.4, color = "gray", na.rm = TRUE) +
+  scale_y_continuous(name = "Snow Depth (cm)") +
+  scale_x_datetime(
+    date_breaks = "1 month",
+    date_labels = "%b",
+    timezone = "UTC"
+  ) +
+  labs(x = "", title = "Snow Depth — Annual") +
+  theme_minimal()
+
+print(p_sd_annual)
 
 ```
 
 
-```{r, warning=FALSE}
-
-
-```
 
 # ANNUAL WIND
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, echo=FALSE}
 
 ## 1. Prepare wind data safely by overwriting the existing 'date' column
 df_wind_openair <- df %>% 
-  filter(!is.na(wind_dir) & !is.na(WS_16_33_1_1_1)) %>% 
+  dplyr::filter(!is.na(wind_dir) & !is.na(WS_16_33_1_1_1)) %>% 
   # Overwrite 'date' column with TIMESTAMP so openair can use it for year grouping
   mutate(date = TIMESTAMP) %>% 
   rename(
@@ -1531,7 +1484,7 @@ for (i in 1:nrow(wind_blocks)) {
 
 # Filter out missing rows and calculate the absolute difference between the two wind variables
 df_wind_clean <- df %>% 
-  filter(!is.na(WS_16_33_1_1_1) & !is.na(wind_speed)) %>%
+  dplyr::filter(!is.na(WS_16_33_1_1_1) & !is.na(wind_speed)) %>%
   mutate(
     # Dynamic metric combining both variables into a unique color value per point
     wind_difference = abs(WS_16_33_1_1_1 - wind_speed),
@@ -1562,7 +1515,7 @@ years_list <- sort(unique(df_wind_clean$year))
 
 # Loop: Print separate 1:1 plot for each year
 for (yr in years_list) {
-  df_year <- df_wind_clean %>% filter(year == yr)
+  df_year <- df_wind_clean %>% dplyr::filter(year == yr)
   
   if (nrow(df_year) == 0) next
   
@@ -1593,7 +1546,7 @@ for (i in 1:nrow(ym_blocks)) {
   current_month <- ym_blocks$month_name[i]
   
   df_month <- df_wind_clean %>% 
-    filter(year == current_year, month_name == current_month)
+    dplyr::filter(year == current_year, month_name == current_month)
   
   # Skip if there's fewer than 2 points to plot
   if (nrow(df_month) < 2) next
@@ -1628,7 +1581,7 @@ df$hour  <- as.numeric(format(df$TIMESTAMP, "%H"))
 
 diel_rad <- df %>%
   group_by(year, month, hour) %>%
-  summarise(
+ dplyr:: summarise(
     rad_mean  = mean(SWIN_6_10_1_1_1, na.rm = TRUE),
     rad_sd    = sd(SWIN_6_10_1_1_1, na.rm = TRUE),
     rpot_mean = mean(rpot, na.rm = TRUE),
@@ -1645,7 +1598,7 @@ for(i in 1:nrow(month_list)) {
   m <- month_list$month[i]
   
   dfm <- diel_rad %>%
-    filter(year == y, month == m)
+    dplyr::filter(year == y, month == m)
   
   p <- ggplot(dfm) +
     
@@ -1693,7 +1646,7 @@ end_date <- as.POSIXct("2026-08-23 23:59:59", tz = "UTC")
 
 df_filtered <- df %>%
   mutate(TIMESTAMP_true = as.POSIXct(TIMESTAMP, tz = "UTC")) %>%
-  filter(TIMESTAMP_true >= cutoff & TIMESTAMP_true <= end_date)
+  dplyr::filter(TIMESTAMP_true >= cutoff & TIMESTAMP_true <= end_date)
 
 # Common styling variables
 lbl_y_temp <- expression("Temperature ("*degree*C*")")
@@ -1711,7 +1664,7 @@ color_map  <- c(
 # =========================================================================
 # Filter out rows where all loggers are NA for this specific depth
 df_p1 <- df_filtered %>% 
-  filter(!is.na(TMS_C_T_1) | !is.na(TMS_E_T_1) | !is.na(TMS_W_T_1) | !is.na(TMS_N_T_1) | !is.na(TMS_S_T_1))
+  dplyr::filter(!is.na(TMS_C_T_1) | !is.na(TMS_E_T_1) | !is.na(TMS_W_T_1) | !is.na(TMS_N_T_1) | !is.na(TMS_S_T_1))
 
 p1 <- ggplot(df_p1, aes(x = TIMESTAMP_true)) +
   theme_minimal() +
@@ -1732,7 +1685,7 @@ print(p1)
 # PLOT 2: 0cm Ground Surface Temperature Horizon
 # =========================================================================
 df_p2 <- df_filtered %>% 
-  filter(!is.na(TMS_C_T_2) | !is.na(TMS_E_T_2) | !is.na(TMS_W_T_2) | !is.na(TMS_N_T_2) | !is.na(TMS_S_T_2))
+  dplyr::filter(!is.na(TMS_C_T_2) | !is.na(TMS_E_T_2) | !is.na(TMS_W_T_2) | !is.na(TMS_N_T_2) | !is.na(TMS_S_T_2))
 
 p2 <- ggplot(df_p2, aes(x = TIMESTAMP_true)) +
   theme_minimal() +
@@ -1753,7 +1706,7 @@ print(p2)
 # PLOT 3: -10cm Soil Temperature Horizon
 # =========================================================================
 df_p3 <- df_filtered %>% 
-  filter(!is.na(TMS_C_T_3) | !is.na(TMS_E_T_3) | !is.na(TMS_W_T_3) | !is.na(TMS_N_T_3) | !is.na(TMS_S_T_3))
+  dplyr::filter(!is.na(TMS_C_T_3) | !is.na(TMS_E_T_3) | !is.na(TMS_W_T_3) | !is.na(TMS_N_T_3) | !is.na(TMS_S_T_3))
 
 p3 <- ggplot(df_p3, aes(x = TIMESTAMP_true)) +
   theme_minimal() +
@@ -1774,7 +1727,7 @@ print(p3)
 # PLOT 4: -10cm Soil Moisture Horizon (VWC)
 # =========================================================================
 df_p4 <- df_filtered %>% 
-  filter(!is.na(TMS_C_VWC) | !is.na(TMS_E_VWC) | !is.na(TMS_W_VWC) | !is.na(TMS_N_VWC) | !is.na(TMS_S_VWC))
+  dplyr::filter(!is.na(TMS_C_VWC) | !is.na(TMS_E_VWC) | !is.na(TMS_W_VWC) | !is.na(TMS_N_VWC) | !is.na(TMS_S_VWC))
 
 p4 <- ggplot(df_p4, aes(x = TIMESTAMP_true)) +
   theme_minimal() +
@@ -1799,7 +1752,7 @@ print(p4)
 
 # 1. Parse timestamps safely and extract chronological blocks
 df_time <- df %>%
-  mutate(
+ dplyr:: mutate(
     TIMESTAMP_true = as.POSIXct(TIMESTAMP, tz = "UTC"),
     year = as.numeric(format(TIMESTAMP_true, "%Y")),
     month = as.numeric(format(TIMESTAMP_true, "%m")),
@@ -1810,7 +1763,7 @@ df_time <- df %>%
 timeline_blocks <- df_time %>%
   distinct(year, month_name) %>%
   arrange(year, month_name) %>%
-  filter(!is.na(month_name))
+  dplyr::filter(!is.na(month_name))
 
 # Common styling variables
 lbl_y_temp <- expression("Temperature ("*degree*C*")")
@@ -1832,13 +1785,13 @@ for (i in 1:nrow(timeline_blocks)) {
   
   # Filter master dataset down to the single month block
   df_month <- df_time %>% 
-    filter(year == current_year, month_name == current_month)
+    dplyr::filter(year == current_year, month_name == current_month)
   
   # -------------------------------------------------------------------------
   # HORIZON 1: +15cm Air Temperature
   # -------------------------------------------------------------------------
   df_p1 <- df_month %>% 
-    filter(!is.na(TMS_C_T_1) | !is.na(TMS_E_T_1) | !is.na(TMS_W_T_1) | !is.na(TMS_N_T_1) | !is.na(TMS_S_T_1))
+   dplyr:: filter(!is.na(TMS_C_T_1) | !is.na(TMS_E_T_1) | !is.na(TMS_W_T_1) | !is.na(TMS_N_T_1) | !is.na(TMS_S_T_1))
   
   # SAFEGUARD: Skip plotting completely if the month contains no row records
   if (nrow(df_p1) >= 2) {
@@ -1862,7 +1815,7 @@ for (i in 1:nrow(timeline_blocks)) {
   # HORIZON 2: 0cm Ground Surface Temperature
   # -------------------------------------------------------------------------
   df_p2 <- df_month %>% 
-    filter(!is.na(TMS_C_T_2) | !is.na(TMS_E_T_2) | !is.na(TMS_W_T_2) | !is.na(TMS_N_T_2) | !is.na(TMS_S_T_2))
+   dplyr:: filter(!is.na(TMS_C_T_2) | !is.na(TMS_E_T_2) | !is.na(TMS_W_T_2) | !is.na(TMS_N_T_2) | !is.na(TMS_S_T_2))
   
   if (nrow(df_p2) >= 2) {
     p2 <- ggplot(df_p2, aes(x = TIMESTAMP_true)) +
@@ -1885,7 +1838,7 @@ for (i in 1:nrow(timeline_blocks)) {
   # HORIZON 3: -10cm Soil Temperature
   # -------------------------------------------------------------------------
   df_p3 <- df_month %>% 
-    filter(!is.na(TMS_C_T_3) | !is.na(TMS_E_T_3) | !is.na(TMS_W_T_3) | !is.na(TMS_N_T_3) | !is.na(TMS_S_T_3))
+   dplyr::filter(!is.na(TMS_C_T_3) | !is.na(TMS_E_T_3) | !is.na(TMS_W_T_3) | !is.na(TMS_N_T_3) | !is.na(TMS_S_T_3))
   
   if (nrow(df_p3) >= 2) {
     p3 <- ggplot(df_p3, aes(x = TIMESTAMP_true)) +
@@ -1908,7 +1861,7 @@ for (i in 1:nrow(timeline_blocks)) {
   # HORIZON 4: -10cm Soil Moisture (VWC)
   # -------------------------------------------------------------------------
   df_p4 <- df_month %>% 
-    filter(!is.na(TMS_C_VWC) | !is.na(TMS_E_VWC) | !is.na(TMS_W_VWC) | !is.na(TMS_N_VWC) | !is.na(TMS_S_VWC))
+   dplyr:: filter(!is.na(TMS_C_VWC) | !is.na(TMS_E_VWC) | !is.na(TMS_W_VWC) | !is.na(TMS_N_VWC) | !is.na(TMS_S_VWC))
   
   if (nrow(df_p4) >= 2) {
     p4 <- ggplot(df_p4, aes(x = TIMESTAMP_true)) +

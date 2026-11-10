@@ -33,7 +33,7 @@ library(dplyr)
 
 ```{r, warning=FALSE}
 
-df = read.csv("C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_202608_202609.csv",)
+df = read.csv("C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_20261001_20261031.csv",)
 
 
 df$TIMESTAMP <- as.POSIXct(df$TIMESTAMP, format = "%Y-%m-%d %H:%M", tz = "UTC")
@@ -42,22 +42,11 @@ df[df == -9999] <- NA
 df[df == -7999] <- NA
 
 
-# Create a complete sequence of timestamps at 30-minute intervals
-tsdf <- data.frame(TIMESTAMP = seq(
-  from = min(df$TIMESTAMP),
-  to = max(df$TIMESTAMP),
-  by = 60*30
-))
-
-
-df = merge(tsdf,df,by = 'TIMESTAMP',all.x = T)
-
-head(df)
 ```
 
 
 ```{r}
-biomet_dates <- c('2026-08-01', '2026-09-30')
+biomet_dates <- c('2026-10-01', '2026-10-31')
 ```
 
 #SLUMP HEAT FLUX COMBINED
@@ -340,7 +329,7 @@ plot(df$TIMESTAMP, df$TS_2_38_4_1_1.c , type = "l", ylim = c(-5, 20))
 ```{r, echo=F}
 
 ggplot(data = df) +
-  geom_line(aes(TIMESTAMP, TS_2_38_6_1_1, col = "5 cm")) +
+  geom_line(aes(TIMESTAMP, TS_2_38_6_1_1, col = "05 cm")) +
   geom_line(aes(TIMESTAMP, TS_2_38_6_2_1, col = "10 cm")) +
   geom_line(aes(TIMESTAMP, TS_2_38_6_3_1, col = "20 cm")) +
   geom_line(aes(TIMESTAMP, TS_2_38_6_4_1, col = "30 cm")) +
@@ -348,7 +337,7 @@ ggplot(data = df) +
   geom_line(aes(TIMESTAMP, TS_2_38_6_6_1, col = "50 cm")) +
   geom_hline(yintercept = 0) +
   scale_y_continuous(
-    limits = c(-5, 15),
+    limits = c(-20, 15),
     expression("Soil T ("*degree*C*")")
   ) +
   scale_x_datetime(limits = as.POSIXct(biomet_dates)) +
@@ -564,7 +553,7 @@ df <- df[!duplicated(df$TIMESTAMP), ]
 
 df$TIMESTAMP <- format(as.POSIXct(df$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
 df$ts = format(as.POSIXct(df$ts), format ="%Y-%m-%d %H:%M")
-write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_slump_c_202608_202609.csv',row.names = F,quote = T)
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/met/flux_met_c_slump_c_20261001_20261031.csv',row.names = F,quote = T)
 
 
 
