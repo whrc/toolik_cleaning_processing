@@ -1,0 +1,454 @@
+---
+title: "TOMST CLEANING"
+author: "Kaj"
+date: "2026-11-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+rm(list = ls())
+Sys.setenv(TZ = "UTC")
+knitr::opts_chunk$set(error = TRUE)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = 'C:/Users/klynoe/Documents/toolik/R_outputs') #use this to set your directory
+
+library(data.table)
+library(ggplot2)
+library(cowplot)
+library(openair)
+library(plotrix)
+library(signal)
+library(svMisc)
+library(zoo)
+library(stringr)
+library(plyr)
+library(dplyr)
+library(tidyr)
+
+```
+
+```{r, warning=FALSE}
+
+df = read.csv('./flux_met_c/flux_c_met_c_202505_202607.csv')
+
+
+```
+
+
+
+```{r, warning=F}
+
+# 1. Parse timestamps safely
+cutoff   <- as.POSIXct("2025-07-01 00:00:00", tz = "UTC")
+end_date <- as.POSIXct("2026-07-31 23:59:59", tz = "UTC")
+
+df_filtered <- df %>%
+  mutate(TIMESTAMP_true = as.POSIXct(TIMESTAMP, tz = "UTC")) %>%
+  dplyr::filter(TIMESTAMP_true >= cutoff & TIMESTAMP_true <= end_date)
+
+# Common styling variables
+lbl_y_temp <- expression("Temperature ("*degree*C*")")
+lbl_y_vwc  <- expression("Soil Moisture VWC (m"^3*"/m"^3*")")
+color_map  <- c(
+  "Center" = "black", 
+  "East"   = "firebrick", 
+  "West"   = "dodgerblue4", 
+  "North"  = "forestgreen", 
+  "South"  = "gold3"
+)
+
+# =========================================================================
+# PLOT 1: +15cm Air Temperature Horizon
+# =========================================================================
+# Filter out rows where all loggers are NA for this specific depth
+df_p1 <- df_filtered %>% 
+  dplyr::filter(!is.na(TMS_C_T_1) | !is.na(TMS_E_T_1) | !is.na(TMS_W_T_1) | !is.na(TMS_N_T_1) | !is.na(TMS_S_T_1))
+
+p1 <- ggplot(df_p1, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.8, linetype = "dashed") +
+  geom_line(aes(y = TMS_C_T_1, color = "Center"), linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_E_T_1, color = "East"),   linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_W_T_1, color = "West"),   linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_N_T_1, color = "North"),  linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_S_T_1, color = "South"),  linewidth = 0.7, na.rm = FALSE) +
+  scale_color_manual(values = color_map, name = "Logger Station") +
+  scale_x_datetime(limits = c(cutoff, end_date), date_breaks = "1 month", date_labels = "%b %Y") +
+  labs(x = "Timeline", y = lbl_y_temp, title = "TMS Network Profile Comparison: +15cm Air Horizon") +
+  theme(legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1), title = element_text(face = "bold"))
+
+print(p1)
+
+# =========================================================================
+# PLOT 2: 0cm Ground Surface Temperature Horizon
+# =========================================================================
+df_p2 <- df_filtered %>% 
+  dplyr::filter(!is.na(TMS_C_T_2) | !is.na(TMS_E_T_2) | !is.na(TMS_W_T_2) | !is.na(TMS_N_T_2) | !is.na(TMS_S_T_2))
+
+p2 <- ggplot(df_p2, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.8, linetype = "dashed") +
+  geom_line(aes(y = TMS_C_T_2, color = "Center"), linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_E_T_2, color = "East"),   linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_W_T_2, color = "West"),   linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_N_T_2, color = "North"),  linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_S_T_2, color = "South"),  linewidth = 0.7, na.rm = FALSE) +
+  scale_color_manual(values = color_map, name = "Logger Station") +
+  scale_x_datetime(limits = c(cutoff, end_date), date_breaks = "1 month", date_labels = "%b %Y") +
+  labs(x = "Timeline", y = lbl_y_temp, title = "TMS Network Profile Comparison: 2cm Ground Surface Horizon") +
+  theme(legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1), title = element_text(face = "bold"))
+
+print(p2)
+
+# =========================================================================
+# PLOT 3: -10cm Soil Temperature Horizon
+# =========================================================================
+df_p3 <- df_filtered %>% 
+  dplyr::filter(!is.na(TMS_C_T_3) | !is.na(TMS_E_T_3) | !is.na(TMS_W_T_3) | !is.na(TMS_N_T_3) | !is.na(TMS_S_T_3))
+
+p3 <- ggplot(df_p3, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, color = "black", linewidth = 0.8, linetype = "dashed") +
+  geom_line(aes(y = TMS_C_T_3, color = "Center"), linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_E_T_3, color = "East"),   linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_W_T_3, color = "West"),   linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_N_T_3, color = "North"),  linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_S_T_3, color = "South"),  linewidth = 0.7, na.rm = FALSE) +
+  scale_color_manual(values = color_map, name = "Logger Station") +
+  scale_x_datetime(limits = c(cutoff, end_date), date_breaks = "1 month", date_labels = "%b %Y") +
+  labs(x = "Timeline", y = lbl_y_temp, title = "TMS Network Profile Comparison: -6cm Soil Temperature Horizon") +
+  theme(legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1), title = element_text(face = "bold"))
+
+print(p3)
+
+# =========================================================================
+# PLOT 4: -10cm Soil Moisture Horizon (VWC)
+# =========================================================================
+df_p4 <- df_filtered %>% 
+  dplyr::filter(!is.na(TMS_C_VWC) | !is.na(TMS_E_VWC) | !is.na(TMS_W_VWC) | !is.na(TMS_N_VWC) | !is.na(TMS_S_VWC))
+
+p4 <- ggplot(df_p4, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_line(aes(y = TMS_C_VWC, color = "Center"), linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_E_VWC, color = "East"),   linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_W_VWC, color = "West"),   linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_N_VWC, color = "North"),  linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_S_VWC, color = "South"),  linewidth = 0.7, na.rm = FALSE) +
+  scale_color_manual(values = color_map, name = "Logger Station") +
+  scale_x_datetime(limits = c(cutoff, end_date), date_breaks = "1 month", date_labels = "%b %Y") +
+  labs(x = "Timeline", y = lbl_y_vwc, title = "TMS Network Profile Comparison: -6cm Soil Moisture Horizon (VWC)") +
+  theme(legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1), title = element_text(face = "bold"))
+
+print(p4)
+
+
+```
+#individual plots
+
+```{r}
+
+# =========================================================================
+# FOCUSED TMS VWC DIAGNOSTICS
+# =========================================================================
+
+# JULY-OCTOBER 2025
+df_vwc_2025 <- df_filtered %>%
+  dplyr::filter(
+    TIMESTAMP_true >= as.POSIXct("2025-07-01", tz = "UTC"),
+    TIMESTAMP_true < as.POSIXct("2025-11-01", tz = "UTC")
+  ) %>%
+  dplyr::filter(
+    !is.na(TMS_C_VWC) | !is.na(TMS_E_VWC) |
+    !is.na(TMS_W_VWC) | !is.na(TMS_N_VWC) |
+    !is.na(TMS_S_VWC)
+  )
+
+# MAY-AUGUST 2026
+df_vwc_2026 <- df_filtered %>%
+  dplyr::filter(
+    TIMESTAMP_true >= as.POSIXct("2026-05-01", tz = "UTC"),
+    TIMESTAMP_true < as.POSIXct("2026-09-01", tz = "UTC")
+  ) %>%
+  dplyr::filter(
+    !is.na(TMS_C_VWC) | !is.na(TMS_E_VWC) |
+    !is.na(TMS_W_VWC) | !is.na(TMS_N_VWC) |
+    !is.na(TMS_S_VWC)
+  )
+
+# =========================================================================
+# 2025 - CENTER
+# =========================================================================
+p_C_2025 <- ggplot(df_vwc_2025, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_line(aes(y = TMS_C_VWC), color = color_map["Center"], linewidth = 0.7) +
+  labs(title = "Center - Jul-Oct 2025", x = "Timeline", y = lbl_y_vwc) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(p_C_2025)
+
+# EAST
+p_E_2025 <- ggplot(df_vwc_2025, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_line(aes(y = TMS_E_VWC), color = color_map["East"], linewidth = 0.7) +
+  labs(title = "East - Jul-Oct 2025", x = "Timeline", y = lbl_y_vwc) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(p_E_2025)
+
+# WEST
+p_W_2025 <- ggplot(df_vwc_2025, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_line(aes(y = TMS_W_VWC), color = color_map["West"], linewidth = 0.7) +
+  labs(title = "West - Jul-Oct 2025", x = "Timeline", y = lbl_y_vwc) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(p_W_2025)
+
+# NORTH
+p_N_2025 <- ggplot(df_vwc_2025, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_line(aes(y = TMS_N_VWC), color = color_map["North"], linewidth = 0.7) +
+  labs(title = "North - Jul-Oct 2025", x = "Timeline", y = lbl_y_vwc) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(p_N_2025)
+
+# SOUTH
+p_S_2025 <- ggplot(df_vwc_2025, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_line(aes(y = TMS_S_VWC), color = color_map["South"], linewidth = 0.7) +
+  labs(title = "South - Jul-Oct 2025", x = "Timeline", y = lbl_y_vwc) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(p_S_2025)
+
+
+# =========================================================================
+# 2026 - CENTER
+# =========================================================================
+p_C_2026 <- ggplot(df_vwc_2026, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_line(aes(y = TMS_C_VWC), color = color_map["Center"], linewidth = 0.7) +
+  labs(title = "Center - May-Aug 2026", x = "Timeline", y = lbl_y_vwc) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(p_C_2026)
+
+# EAST
+p_E_2026 <- ggplot(df_vwc_2026, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_line(aes(y = TMS_E_VWC), color = color_map["East"], linewidth = 0.7) +
+  labs(title = "East - May-Aug 2026", x = "Timeline", y = lbl_y_vwc) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(p_E_2026)
+
+# WEST
+p_W_2026 <- ggplot(df_vwc_2026, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_line(aes(y = TMS_W_VWC), color = color_map["West"], linewidth = 0.7) +
+  labs(title = "West - May-Aug 2026", x = "Timeline", y = lbl_y_vwc) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(p_W_2026)
+
+# NORTH
+p_N_2026 <- ggplot(df_vwc_2026, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_line(aes(y = TMS_N_VWC), color = color_map["North"], linewidth = 0.7) +
+  labs(title = "North - May-Aug 2026", x = "Timeline", y = lbl_y_vwc) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(p_N_2026)
+
+# SOUTH
+p_S_2026 <- ggplot(df_vwc_2026, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_line(aes(y = TMS_S_VWC), color = color_map["South"], linewidth = 0.7) +
+  labs(title = "South - May-Aug 2026", x = "Timeline", y = lbl_y_vwc) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(p_S_2026)
+
+```
+
+
+#remove zeros
+```{r}
+
+# ============================================================
+# TMS NORTH VWC - REMOVE ZERO READINGS ONLY
+# ============================================================
+
+df_clean_N <- as.data.table(copy(df_filtered))
+setorder(df_clean_N, TIMESTAMP_true)
+
+# Preserve original and create cleaned column
+df_clean_N[, TMS_N_VWC.c := TMS_N_VWC]
+
+# Replace exact zeros with NA
+df_clean_N[TMS_N_VWC == 0, TMS_N_VWC.c := NA_real_]
+
+# Cleaning summary
+cat("Original:", sum(!is.na(df_clean_N$TMS_N_VWC)), "\n")
+cat("Zero readings:", sum(df_clean_N$TMS_N_VWC == 0, na.rm = TRUE), "\n")
+cat("Removed:", sum(!is.na(df_clean_N$TMS_N_VWC) & is.na(df_clean_N$TMS_N_VWC.c)), "\n")
+cat("Remaining:", sum(!is.na(df_clean_N$TMS_N_VWC.c)), "\n")
+
+```
+
+```{r}
+
+
+# ============================================================
+# TMS SOUTH VWC - REMOVE ZERO READINGS ONLY
+# ============================================================
+
+df_clean_S <- as.data.table(copy(df_filtered))
+setorder(df_clean_S, TIMESTAMP_true)
+
+# Preserve original and create cleaned column
+df_clean_S[, TMS_S_VWC.c := TMS_S_VWC]
+
+# Replace exact zeros with NA
+df_clean_S[TMS_S_VWC == 0, TMS_S_VWC.c := NA_real_]
+
+# Cleaning summary
+cat("Original:", sum(!is.na(df_clean_S$TMS_S_VWC)), "\n")
+cat("Zero readings:", sum(df_clean_S$TMS_S_VWC == 0, na.rm = TRUE), "\n")
+cat("Removed:", sum(!is.na(df_clean_S$TMS_S_VWC) & is.na(df_clean_S$TMS_S_VWC.c)), "\n")
+cat("Remaining:", sum(!is.na(df_clean_S$TMS_S_VWC.c)), "\n")
+
+```
+
+#plot raw vs. cleaned
+
+```{r}
+# =========================================================================
+# TMS VWC - ORIGINAL VS CLEANED
+# =========================================================================
+
+# JULY-OCTOBER 2025
+df_2025 <- df_clean %>%
+  dplyr::filter(
+    TIMESTAMP_true >= as.POSIXct("2025-07-01", tz = "UTC"),
+    TIMESTAMP_true < as.POSIXct("2025-11-01", tz = "UTC"),
+    !is.na(TMS_S_VWC) | !is.na(TMS_S_VWC.c)
+  )
+
+p_2025 <- ggplot(df_2025, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_line(aes(y = TMS_S_VWC, color = "Original"), linewidth = 0.7) +
+  geom_line(aes(y = TMS_S_VWC.c, color = "Cleaned"), linewidth = 0.7) +
+  scale_color_manual(values = c("Original" = "grey65", "Cleaned" = "blue")) +
+  labs(title = "S VWC - July to October 2025",
+       x = "Timeline", y = lbl_y_vwc, color = NULL) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p_2025)
+
+
+# MAY-AUGUST 2026
+df_2026 <- df_clean_N %>%
+  dplyr::filter(
+    TIMESTAMP_true >= as.POSIXct("2026-05-01", tz = "UTC"),
+    TIMESTAMP_true < as.POSIXct("2026-09-01", tz = "UTC"),
+    !is.na(TMS_N_VWC) | !is.na(TMS_N_VWC.c)
+  )
+
+p_2026 <- ggplot(df_2026, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_line(aes(y = TMS_N_VWC, color = "Original"), linewidth = 0.7) +
+  geom_line(aes(y = TMS_N_VWC.c, color = "Cleaned"), linewidth = 0.7) +
+  scale_color_manual(values = c("Original" = "grey65", "Cleaned" = "blue")) +
+  labs(title = "N VWC - May to August 2026",
+       x = "Timeline", y = lbl_y_vwc, color = NULL) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p_2026)
+
+```
+
+
+#add .c to variables
+```{r}
+
+setDT(df)
+
+# Create cleaned columns directly in df
+df[, TMS_N_VWC.c := TMS_N_VWC]
+df[, TMS_S_VWC.c := TMS_S_VWC]
+
+# Remove exact zero readings in the cleaned columns
+df[TMS_N_VWC == 0, TMS_N_VWC.c := NA_real_]
+df[TMS_S_VWC == 0, TMS_S_VWC.c := NA_real_]
+
+# All temperature columns
+tms_temp <- c(
+  paste0("TMS_", c("C", "E", "W", "N", "S"), "_T_", 1:3)
+)
+
+# Copy original temperatures into .c columns
+for (v in tms_temp) {
+  df[, paste0(v, ".c") := get(v)]
+}
+
+# Other VWC columns (unchanged)
+for (v in c("TMS_C_VWC", "TMS_E_VWC", "TMS_W_VWC")) {
+  df[, paste0(v, ".c") := get(v)]
+}
+
+# Verify
+grep("\\.c$", names(df), value = TRUE)
+
+
+```
+
+
+#plot vwc.c
+
+```{r}
+# =========================================================================
+# PLOT 4: -10cm Soil Moisture Horizon (VWC) - CLEANED
+# =========================================================================
+# 1. Parse timestamps safely
+cutoff   <- as.POSIXct("2025-07-01 00:00:00", tz = "UTC")
+end_date <- as.POSIXct("2026-07-31 23:59:59", tz = "UTC")
+
+df_filtered <- df %>%
+  mutate(TIMESTAMP_true = as.POSIXct(TIMESTAMP, tz = "UTC")) %>%
+  dplyr::filter(TIMESTAMP_true >= cutoff & TIMESTAMP_true <= end_date)
+df_p4 <- df_filtered %>% 
+  dplyr::filter(!is.na(TMS_C_VWC.c) | !is.na(TMS_E_VWC.c) | !is.na(TMS_W_VWC.c) |
+                !is.na(TMS_N_VWC.c) | !is.na(TMS_S_VWC.c))
+
+p4 <- ggplot(df_p4, aes(x = TIMESTAMP_true)) +
+  theme_minimal() +
+  geom_line(aes(y = TMS_C_VWC.c, color = "Center"), linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_E_VWC.c, color = "East"),   linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_W_VWC.c, color = "West"),   linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_N_VWC.c, color = "North"),  linewidth = 0.7, na.rm = FALSE) +
+  geom_line(aes(y = TMS_S_VWC.c, color = "South"),  linewidth = 0.7, na.rm = FALSE) +
+  scale_color_manual(values = color_map, name = "Logger Station") +
+  scale_x_datetime(limits = c(cutoff, end_date), date_breaks = "1 month", date_labels = "%b %Y") +
+  labs(x = "Timeline", y = lbl_y_vwc, title = "TMS Network Profile Comparison: -6cm Soil Moisture Horizon (VWC, Cleaned)") +
+  theme(legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1), title = element_text(face = "bold"))
+
+print(p4)
+
+```
+
+
+#SAVE
+```{r}
+
+
+df <- df[!duplicated(df$TIMESTAMP), ]
+
+df$TIMESTAMP <- format(as.POSIXct(df$TIMESTAMP), format ="%Y-%m-%d %H:%M" )
+df$ts = format(as.POSIXct(df$ts), format ="%Y-%m-%d %H:%M")
+write.csv(x = df,file = 'C:/Users/klynoe/Documents/toolik/R_outputs/flux_met_c/flux_c_met_c_202505_202607.csv',row.names = F,quote = T)
+
+
+```
+
+
+
+
+
+
+
+

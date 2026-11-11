@@ -22,14 +22,7 @@ Sys.setenv(TZ = "UTC")
 
 Load Data
 ```{r}
-df1 = fread(input = "toolik_flux_c_met_c_tms_202505_202512.csv")
-df2 = fread(input = "toolik_flux_c_met_c_tms_202603_202607.csv")
-
-df = rbindlist(
-  list(df1, df2),
-  use.names = TRUE,
-  fill = TRUE
-)
+df = read.csv('./flux_c_met_c_202505_202607.csv')
 
 df$TIMESTAMP <- as.POSIXct(
   df$TIMESTAMP,
@@ -116,7 +109,7 @@ RH      = df$RH.c   #RH in %
 T_SONIC = df$sonic_temperature-273.15 #sonic temp in Deg C
 VPD     = ((100 - RH)/100)*SVP/100 #VPD in hPA
 D_SNOW  = df$SD_10_99_1_1_1.c*100  # snow depth in cm
-#P       = df$P_RAIN_8_19_1_1_1 # rain in mm
+P       = df$P_RAIN_8_19_1_1_1 # rain in mm
 
 #Radiation #####################################
 ALB = df$ALB_1_1_1.c*100 #albedo in %
@@ -134,34 +127,59 @@ PPFD_OUT = df$PPFDR_7_23_1_1_1.c # par out umol m-2 s-1
 #Soil factors ###################################
 #all swc in %
 SWC_1_1_1 = df$SWC_12_36_1_1_1.c
-SWC_1_2_1 = df$SWC_12_36_2_1_1.c
-SWC_1_3_1 = df$SWC_12_36_3_1_1.c
+SWC_1_2_1 = df$SWC_12_36_1_2_1.c
+SWC_1_3_1 = df$SWC_12_36_1_3_1.c
 
 #all soil temps deg C
 TS_1_1_1 = df$TS_2_38_1_1_1.c
-TS_1_2_1 = df$TS_2_38_2_1_1.c
-TS_1_3_1 = df$TS_2_38_2_2_1.c
+TS_1_2_1 = df$TS_2_38_1_2_1.c
+TS_1_3_1 = df$TS_2_38_1_3_1.c
 
-TA_8_1_1 = df$TMS_W_T_1
-TS_8_1_1 = df$TMS_W_T_2
-TS_8_2_1 = df$TMS_W_T_3
-TA_9_1_1 = df$TMS_N_T_1
-TS_9_1_1 = df$TMS_N_T_2
-TS_9_2_1 = df$TMS_N_T_3
-TA_10_1_1 = df$TMS_S_T_1
-TS_10_1_1 = df$TMS_S_T_2
-TS_10_2_1 = df$TMS_S_T_3
-TA_11_1_1 = df$TMS_E_T_1
-TS_11_1_1 = df$TMS_E_T_2
-TS_11_2_1 = df$TMS_E_T_3
-TA_12_1_1 = df$TMS_C_T_1
-TS_12_1_1 = df$TMS_C_T_2
-TS_12_2_1 = df$TMS_C_T_3
-SWC_8_1_1 = df$TMS_W_VWC
-SWC_9_1_1 = df$TMS_N_VWC
-SWC_10_1_1 = df$TMS_S_VWC
-SWC_11_1_1 = df$TMS_E_VWC
-SWC_12_1_1 = df$TMS_C_VWC
+#SLUMP
+#G_3_1_1 = SHF_6_37_3_1_1
+#G_4_1_1 = SHF_6_37_4_1_1
+#G_5_1_1 = SHF_6_37_5_1_1
+#SWC_2_1_1 = SWC_12_36_2_1_1
+#SWC_3_1_1 = SWC_12_36_3_1_1
+#SWC_4_1_1 = SWC_12_36_4_1_1
+#TS_2_1_1 = TS_2_38_2_1_1
+#TS_3_1_1 = TS_2_38_3_1_1
+#TS_4_1_1 = TS_2_38_4_1_1
+#TS_6_1_1 = TS_2_38_6_1_1
+#TS_6_2_1 = TS_2_38_6_2_1
+#TS_6_3_1 = TS_2_38_6_3_1
+#TS_6_4_1 = TS_2_38_6_4_1
+#TS_6_5_1 = TS_2_38_6_5_1
+#TS_6_6_1 = TS_2_38_6_6_1
+#TS_7_1_1 = TS_2_38_7_1_1
+#TS_7_2_1 = TS_2_38_7_2_1
+#TS_7_3_1 = TS_2_38_7_3_1
+#TS_7_4_1 = TS_2_38_7_4_1
+#TS_7_5_1 = TS_2_38_7_5_1
+#TS_7_6_1 = TS_2_38_7_6_1
+
+
+#TOMST
+TA_8_1_1 = df$TMS_W_T_1.c
+TS_8_1_1 = df$TMS_W_T_2.c
+TS_8_2_1 = df$TMS_W_T_3.c
+TA_9_1_1 = df$TMS_N_T_1.c
+TS_9_1_1 = df$TMS_N_T_2.c
+TS_9_2_1 = df$TMS_N_T_3.c
+TA_10_1_1 = df$TMS_S_T_1.c
+TS_10_1_1 = df$TMS_S_T_2.c
+TS_10_2_1 = df$TMS_S_T_3.c
+TA_11_1_1 = df$TMS_E_T_1.c
+TS_11_1_1 = df$TMS_E_T_2.c
+TS_11_2_1 = df$TMS_E_T_3.c
+TA_12_1_1 = df$TMS_C_T_1.c
+TS_12_1_1 = df$TMS_C_T_2.c
+TS_12_2_1 = df$TMS_C_T_3.c
+SWC_8_1_1 = df$TMS_W_VWC.c
+SWC_9_1_1 = df$TMS_N_VWC.c
+SWC_10_1_1 = df$TMS_S_VWC.c
+SWC_11_1_1 = df$TMS_E_VWC.c
+SWC_12_1_1 = df$TMS_C_VWC.c
 
 #wind and turbulence parameters ##############################
 MO_LENGTH = df$L
@@ -230,7 +248,7 @@ plot(T_SONIC)
 plot(TA)   
 plot(VPD) 
 plot(D_SNOW)
-#plot(P)
+plot(P)
 ```
 
 ```{r}
@@ -319,7 +337,7 @@ US_RTS = data.frame(TIMESTAMP_START,TIMESTAMP_END,
 ,TA   
 ,VPD 
 ,D_SNOW
-#,P
+,P
 ,ALB
 ,LW_IN
 ,LW_OUT
