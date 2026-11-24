@@ -326,20 +326,6 @@ source(
   local = TRUE
 )
 
-df_month <- prepare_diel_data(df_month)
-
-# Monthly diel
-diel_month <- make_diel(
-  df_month,
-  group_cols = c("year", "month", "hour")
-)
-
-# Weekly diel
-diel_week <- make_diel(
-  df_month,
-  group_cols = c("year", "month", "week_in_month", "hour")
-)
-
 ```
 #MONTHLY DIURNALS
 
